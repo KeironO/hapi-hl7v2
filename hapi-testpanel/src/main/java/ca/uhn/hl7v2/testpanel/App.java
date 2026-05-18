@@ -33,6 +33,8 @@ import javax.swing.UIManager;
 
 import org.apache.log4j.xml.DOMConfigurator;
 
+import com.formdev.flatlaf.FlatLightLaf;
+
 import ca.uhn.hl7v2.testpanel.controller.Controller;
 import ca.uhn.hl7v2.testpanel.controller.Prefs;
 import ca.uhn.hl7v2.util.MessageIDGenerator;
@@ -51,10 +53,18 @@ public class App {
 		System.setProperty(MessageIDGenerator.NEVER_FAIL_PROPERTY, Boolean.TRUE.toString());
 		
 		try {
-			// Set System L&F
-			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+			String osName = System.getProperty("os.name").toLowerCase();
+			if (osName.contains("mac")) {
+				UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+			} else {
+				FlatLightLaf.install();
+			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			try {
+				UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+			} catch (Exception e2) {
+				e2.printStackTrace();
+			}
 		} 
 
 		System.setProperty("tespanel.log.dir", Prefs.getTestpanelHomeDirectory().getAbsolutePath());

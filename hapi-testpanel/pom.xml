@@ -188,6 +188,11 @@
 			<artifactId>jaxb-runtime</artifactId>
 			<version>4.0.4</version>
 		</dependency>
+		<dependency>
+			<groupId>com.formdev</groupId>
+			<artifactId>flatlaf</artifactId>
+			<version>3.2.5</version>
+		</dependency>
 
 	</dependencies>
 	<build>
@@ -254,6 +259,14 @@
 				<version>${maven.deploy.plugin.version}</version>
 				<configuration>
 					<skip>true</skip>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jpackage-maven-plugin</artifactId>
+				<version>0.1.5</version>
+				<configuration>
+					<mainClass>ca.uhn.hl7v2.testpanel.App</mainClass>
 				</configuration>
 			</plugin>
 		</plugins>

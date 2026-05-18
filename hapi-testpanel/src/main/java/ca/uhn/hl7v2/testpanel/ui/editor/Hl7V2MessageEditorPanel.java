@@ -35,7 +35,6 @@ import java.awt.Frame;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.awt.Point;
 import java.awt.SystemColor;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
@@ -75,6 +74,8 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.Highlighter;
 
+import ca.uhn.hl7v2.model.Message;
+import ca.uhn.hl7v2.testpanel.model.msg.AbstractMessage;
 import jsyntaxpane.DefaultSyntaxKit;
 
 import org.apache.commons.lang.StringUtils;
@@ -107,7 +108,6 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 	private static final String CREATE_NEW_CONNECTION = "Create New Connection...";
 	private static final String NO_CONNECTIONS = "No Connections";
 	private static final Logger ourLog = LoggerFactory.getLogger(Hl7V2MessageEditorPanel.class);
-	private SendOptionsPopupDialog mySendOptionsPopupDialog;
 
 	static {
 
@@ -124,7 +124,6 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 	}
 
 	private boolean myDontRespondToSourceMessageChanges;
-	private Component myhorizontalStrut_4;
 	private JPanel bottomPanel;
 	private JPanel messageEditorContainerPanel;
 	private JComboBox myShowCombo;
@@ -154,7 +153,6 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 	private JLabel myTerserPathTextField;
 	private JToolBar mytoolBar;
 	private Hl7V2MessageTree myTreePanel;
-	private JScrollPane myTreeScrollPane;
 	private JPanel treeContainerPanel;
 	private JTabbedPane myTopTabBar;
 	// private JPanel mySendingPanel;
@@ -178,7 +176,8 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 	private JButton collapseAllButton;
 	private JButton expandAllButton;
 	private Component myhorizontalStrut_2;
-	private JButton mySendOptionsButton;
+	private javax.swing.JSpinner mySendTimesSpinner;
+	private JLabel mySendTimesLabel;
 
 	/**
 	 * Create the panel.
@@ -191,8 +190,8 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		setLayout(new BorderLayout(0, 0));
 
 		mysplitPane = new JSplitPane();
-		mysplitPane.setResizeWeight(0.5);
-		mysplitPane.setOrientation(JSplitPane.VERTICAL_SPLIT);
+		mysplitPane.setResizeWeight(0.75);
+		mysplitPane.setOrientation(JSplitPane.HORIZONTAL_SPLIT);
 		add(mysplitPane);
 
 		mysplitPane.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, new PropertyChangeListener() {
@@ -205,7 +204,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
-				mysplitPane.setDividerLocation(Prefs.getInstance().getHl7EditorSplit());
+				mysplitPane.setDividerLocation(0.25);
 			}
 		});
 
@@ -221,7 +220,15 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		myMessageEditor.setSelectedTextColor(Color.black);
 
 		myMessageEditor.setCaret(new EditorCaret());
-		
+
+		myMessageEditor.addCaretListener(new javax.swing.event.CaretListener() {
+			public void caretUpdate(javax.swing.event.CaretEvent e) {
+				if (myFollowToggle.isSelected()) {
+					highlightFieldAtCursorPosition(e.getDot());
+				}
+			}
+		});
+
 		myMessageScrollPane = new JScrollPane(myMessageEditor);
 		messageEditorContainerPanel.add(myMessageScrollPane);
 
@@ -281,7 +288,6 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 				mySpinnerIconOn.setImageObserver(null);
 			}
 		});
-		myTreeScrollPane = new JScrollPane(myTreePanel);
 
 		myTopTabBar = new JTabbedPane();
 		treeContainerPanel.add(myTopTabBar);
@@ -289,7 +295,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 		JPanel treeContainer = new JPanel();
 		treeContainer.setLayout(new BorderLayout(0, 0));
-		treeContainer.add(myTreeScrollPane);
+		treeContainer.add(myTreePanel);
 
 		myTopTabBar.add("Message Tree", treeContainer);
 
@@ -349,14 +355,14 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		mytoolBar = new JToolBar();
 		mytoolBar.setFloatable(false);
 		mytoolBar.setRollover(true);
-		treeContainerPanel.add(mytoolBar, BorderLayout.NORTH);
+		add(mytoolBar, BorderLayout.NORTH);
 
-		myOutboundInterfaceCombo = new JComboBox();
+		JLabel sendLabel = new JLabel("Send");
+		sendLabel.setBorder(new javax.swing.border.EmptyBorder(0, 5, 0, 10));
+		mytoolBar.add(sendLabel);
+
 		myOutboundInterfaceComboModel = new DefaultComboBoxModel();
-
-		mylabel_1 = new JLabel("Send");
-		mytoolBar.add(mylabel_1);
-		myOutboundInterfaceCombo.setModel(myOutboundInterfaceComboModel);
+		myOutboundInterfaceCombo = new JComboBox<>(myOutboundInterfaceComboModel);
 		myOutboundInterfaceCombo.setMaximumSize(new Dimension(200, 32767));
 		mytoolBar.add(myOutboundInterfaceCombo);
 
@@ -365,55 +371,48 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		mySendButton.setBorderPainted(false);
 		mySendButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				// int selectedIndex =
-				// myOutboundInterfaceComboModel.getIndexOf(myOutboundInterfaceComboModel.getSelectedItem());
 				int selectedIndex = myOutboundInterfaceCombo.getSelectedIndex();
 				OutboundConnection connection = myController.getOutboundConnectionList().getConnections().get(selectedIndex);
 				activateSendingActivityTabForConnection(connection);
 				myController.sendMessages(connection, myMessage, mySendingActivityTable.provideTransmissionCallback());
 			}
 		});
-
-		myhorizontalStrut_2 = Box.createHorizontalStrut(20);
-		myhorizontalStrut_2.setPreferredSize(new Dimension(2, 0));
-		myhorizontalStrut_2.setMinimumSize(new Dimension(2, 0));
-		myhorizontalStrut_2.setMaximumSize(new Dimension(2, 32767));
+		// I AM GOING TO KILL MYSELF
+		myhorizontalStrut_2 = Box.createHorizontalStrut(10);
+		myhorizontalStrut_2.setMaximumSize(new Dimension(10, 32767));
 		mytoolBar.add(myhorizontalStrut_2);
 
-		mySendOptionsButton = new JButton("Options");
-		mySendOptionsButton.setBorderPainted(false);
-		final HoverButtonMouseAdapter sendOptionsHoverAdaptor = new HoverButtonMouseAdapter(mySendOptionsButton);
-		mySendOptionsButton.addMouseListener(sendOptionsHoverAdaptor);
-		mySendOptionsButton.setIcon(new ImageIcon(Hl7V2MessageEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/sendoptions.png")));
-		mytoolBar.add(mySendOptionsButton);
-		mySendOptionsButton.addActionListener(new ActionListener() {
+		mySendTimesLabel = new JLabel("Times:");
+		mySendTimesLabel.setBorder(new javax.swing.border.EmptyBorder(0, 5, 0, 5));
+		mytoolBar.add(mySendTimesLabel);
 
-			public void actionPerformed(ActionEvent theE) {
-				if (mySendOptionsPopupDialog != null) {
-					mySendOptionsPopupDialog.doHide();
-					mySendOptionsPopupDialog = null;
-					return;
+		mySendTimesSpinner = new javax.swing.JSpinner(new javax.swing.SpinnerNumberModel(1, 1, 1000, 1));
+		mySendTimesSpinner.setMaximumSize(new Dimension(60, 32767));
+		mySendTimesSpinner.setPreferredSize(new Dimension(60, 27));
+		mytoolBar.add(mySendTimesSpinner);
+		mySendTimesSpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+			public void stateChanged(javax.swing.event.ChangeEvent e) {
+				if (myMessage != null) {
+					int value = (Integer) mySendTimesSpinner.getValue();
+					myMessage.setSendNumberOfTimes(value);
 				}
-				mySendOptionsPopupDialog = new SendOptionsPopupDialog(Hl7V2MessageEditorPanel.this, myMessage, mySendOptionsButton, sendOptionsHoverAdaptor);
-				Point los = mySendOptionsButton.getLocationOnScreen();
-				mySendOptionsPopupDialog.setLocation(los.x, los.y + mySendOptionsButton.getHeight());
-				mySendOptionsPopupDialog.setVisible(true);
 			}
 		});
 
 		mySendButton.setIcon(new ImageIcon(Hl7V2MessageEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/button_execute.png")));
 		mytoolBar.add(mySendButton);
 
-		myhorizontalStrut_1 = Box.createHorizontalStrut(20);
+		myhorizontalStrut_1 = Box.createHorizontalStrut(15);
+		myhorizontalStrut_1.setMaximumSize(new Dimension(15, 32767));
 		mytoolBar.add(myhorizontalStrut_1);
 
 		mylabel_2 = new JLabel("Validate");
+		mylabel_2.setBorder(new javax.swing.border.EmptyBorder(0, 5, 0, 10));
 		mytoolBar.add(mylabel_2);
 
 		myProfileCombobox = new JComboBox();
 		mytoolBar.add(myProfileCombobox);
 		myProfileCombobox.setPreferredSize(new Dimension(200, 27));
-		myProfileCombobox.setMinimumSize(new Dimension(200, 27));
 		myProfileCombobox.addActionListener(new ActionListener() {
 
 			public void actionPerformed(ActionEvent e) {
@@ -456,27 +455,9 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		myProfileCombobox.setMaximumSize(new Dimension(300, 32767));
 		myProfileCombobox.setModel(myProfileComboboxModel);
 
-		myhorizontalStrut_4 = Box.createHorizontalStrut(20);
-		myhorizontalStrut_4.setPreferredSize(new Dimension(2, 0));
-		myhorizontalStrut_4.setMinimumSize(new Dimension(2, 0));
-		myhorizontalStrut_4.setMaximumSize(new Dimension(2, 32767));
-		mytoolBar.add(myhorizontalStrut_4);
-
-		// mySendingPanel = new JPanel();
-		// mySendingPanel.setBorder(null);
-		// myTopTabBar.addTab("Sending", null, mySendingPanel, null);
-		// mySendingPanel.setLayout(new BorderLayout(0, 0));
-
 		mySendingActivityTable = new ActivityTable();
 		mySendingActivityTable.setController(myController);
 		myTopTabBar.addTab("Sending", null, mySendingActivityTable, null);
-
-		// mySendingPanelScrollPanel = new JScrollPane();
-		// mySendingPanelScrollPanel.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
-		// mySendingPanelScrollPanel.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
-		// mySendingPanelScrollPanel.setColumnHeaderView(mySendingActivityTable);
-		//
-		// mySendingPanel.add(mySendingPanelScrollPanel, BorderLayout.CENTER);
 
 		bottomPanel = new JPanel();
 		bottomPanel.setPreferredSize(new Dimension(10, 20));
@@ -588,6 +569,9 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 					myController.invokeInBackground(new Runnable() {
 						public void run() {
 							myMessage.setHighlitedPathBasedOnRange(new Range(theE.getDot(), theE.getMark()));
+							if (myFollowToggle.isSelected()) {
+								myTreePanel.synchronizeTreeWithHighlitedPath();
+							}
 							myTreePanel.repaint();
 						}});
 				}
@@ -660,6 +644,8 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		String selected = (String) myOutboundInterfaceCombo.getSelectedItem();
 		if (selected == null || selected == NO_CONNECTIONS) {
 			mySendButton.setEnabled(false);
+			mySendTimesSpinner.setEnabled(false);
+			mySendTimesLabel.setEnabled(false);
 			if (myMessage != null) {
 				myMessage.setLastSendToInterfaceId(null);
 			}
@@ -689,6 +675,8 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		}
 
 		mySendButton.setEnabled(true);
+		mySendTimesSpinner.setEnabled(true);
+		mySendTimesLabel.setEnabled(true);
 	}
 
 
@@ -773,14 +761,10 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 			public void propertyChange(PropertyChangeEvent theEvt) {
 				if (theEvt.getNewValue() == null || !myFollowToggle.isSelected()) {
+					removeHighlights();
 					return;
 				}
 				Range range = (Range) theEvt.getNewValue();
-
-				// myMessageScrollPane.getHorizontalScrollBar().setValue(0);
-
-				// myMessageEditor.select(range.getStart(), range.getEnd());
-				// myMessageEditor.setCaretPosition(range.getStart());
 
 				myMessageEditor.setCaretPosition(range.getStart());
 				myMessageEditor.moveCaretPosition(range.getEnd());
@@ -788,7 +772,14 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 				myMessageEditor.setCaretPosition(range.getEnd());
 				myMessageEditor.moveCaretPosition(range.getStart());
 
-				// myMessageEditor.grabFocus();
+				removeHighlights();
+				try {
+					Highlighter hilite = myMessageEditor.getHighlighter();
+					hilite.addHighlight(range.getStart(), range.getEnd(), new javax.swing.text.DefaultHighlighter.DefaultHighlightPainter(new Color(200, 220, 255)));
+				} catch (javax.swing.text.BadLocationException e) {
+					ourLog.error("Failed to highlight range", e);
+				}
+
 				myMessageEditor.repaint();
 
 				String substring = myMessage.getSourceMessage().substring(range.getStart(), range.getEnd());
@@ -825,6 +816,73 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		Highlighter.Highlight[] hilites = hilite.getHighlights();
 		for (int i = 0; i < hilites.length; i++) {
 			hilite.removeHighlight(hilites[i]);
+		}
+	}
+
+	private void highlightFieldAtCursorPosition(int cursorPos) {
+		if (myMessage == null) {
+			return;
+		}
+
+		String sourceMessage = myMessage.getSourceMessage();
+		if (sourceMessage == null || cursorPos < 0 || cursorPos > sourceMessage.length()) {
+			removeHighlights();
+			return;
+		}
+
+		// Get encoding characters from the parsed message
+		ca.uhn.hl7v2.parser.EncodingCharacters enc = null;
+		try {
+			java.util.List<AbstractMessage<?>> messages = myMessage.getMessages();
+			if (messages != null && messages.size() > 0 && messages.get(0) instanceof Message) {
+				enc = ca.uhn.hl7v2.parser.EncodingCharacters.getInstance((Message) messages.get(0));
+			}
+		} catch (Exception e) {
+			// Fall back to default
+		}
+
+		if (enc == null) {
+			enc = new ca.uhn.hl7v2.parser.EncodingCharacters('|', '^', '&', '\\', '~');
+		}
+
+		char fieldSep = enc.getFieldSeparator();
+		char componentSep = enc.getComponentSeparator();
+		char subcomponentSep = enc.getSubcomponentSeparator();
+		char escapeChar = enc.getEscapeCharacter();
+		char repetitionSep = enc.getRepetitionSeparator();
+
+		int fieldStart = cursorPos;
+		int fieldEnd = cursorPos;
+
+		char[] chars = sourceMessage.toCharArray();
+
+		// Find start of field (go back until we hit field separator or start of string)
+		while (fieldStart > 0) {
+			char c = chars[fieldStart - 1];
+			if (c == fieldSep) {
+				break;
+			}
+			fieldStart--;
+		}
+
+		// Find end of field (go forward until we hit field separator or end of string)
+		while (fieldEnd < chars.length) {
+			char c = chars[fieldEnd];
+			if (c == fieldSep) {
+				break;
+			}
+			fieldEnd++;
+		}
+
+		// Remove old highlights
+		removeHighlights();
+
+		// Add new highlight
+		try {
+			Highlighter hilite = myMessageEditor.getHighlighter();
+			hilite.addHighlight(fieldStart, fieldEnd, new javax.swing.text.DefaultHighlighter.DefaultHighlightPainter(new Color(200, 220, 255)));
+		} catch (javax.swing.text.BadLocationException e) {
+			ourLog.error("Failed to highlight field at cursor", e);
 		}
 	}
 

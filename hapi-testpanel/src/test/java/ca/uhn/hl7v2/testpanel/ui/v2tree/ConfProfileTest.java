@@ -125,7 +125,7 @@ public class ConfProfileTest {
 			public void run() {
 				tree = new Hl7V2MessageTree(null);
 				treeNodeRoot = tree.new TreeNodeRoot();
-				tree.setModel(new DefaultOutlineModel(new DefaultTreeModel(treeNodeRoot), new DefaultTableModel(), false, null) {});
+				tree.setTreeModel(new DefaultTreeModel(treeNodeRoot));
 			}});
 	}
 	

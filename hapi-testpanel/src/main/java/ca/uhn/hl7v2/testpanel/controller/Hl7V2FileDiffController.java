@@ -6,6 +6,9 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.Reader;
+import java.io.StringReader;
+import java.util.Arrays;
 
 import javax.swing.SwingUtilities;
 
@@ -21,6 +24,10 @@ import ca.uhn.hl7v2.util.Hl7InputStreamMessageIterator;
 import ca.uhn.hl7v2.util.Terser;
 
 public class Hl7V2FileDiffController {
+
+	public enum InputMode {
+		FILE, TEXT
+	}
 
 	private static final int OUTPUT_LINES = 1000;
 	private static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(Hl7V2FileDiffController.class);
@@ -127,6 +134,43 @@ public class Hl7V2FileDiffController {
 	public void begin() {
 		assert SwingUtilities.isEventDispatchThread() : "Shouldn't be called from " + Thread.currentThread().getName();
 
+		InputMode mode = myView.getInputMode();
+
+		if (mode == InputMode.TEXT) {
+			beginWithTextInput();
+		} else {
+			beginWithFileInput();
+		}
+	}
+
+	private void beginWithTextInput() {
+		String text1 = myView.getPane1Text();
+		String text2 = myView.getPane2Text();
+
+		if (StringUtils.isBlank(text1)) {
+			myMasterController.showDialogError("Left pane is empty");
+			return;
+		}
+		if (StringUtils.isBlank(text2)) {
+			myMasterController.showDialogError("Right pane is empty");
+			return;
+		}
+
+		myFile1Size = text1.length();
+		myFile2Size = text2.length();
+
+		myCountingReader1 = new CharCountingReaderWrapper(new StringReader(text1));
+		myCountingReader2 = new CharCountingReaderWrapper(new StringReader(text2));
+
+		myMessageIter1 = new Hl7InputStreamMessageIterator(myCountingReader1);
+		myMessageIter1.setIgnoreComments(true);
+		myMessageIter2 = new Hl7InputStreamMessageIterator(myCountingReader2);
+		myMessageIter2.setIgnoreComments(true);
+
+		startComparison("Pane 1", "Pane 2");
+	}
+
+	private void beginWithFileInput() {
 		File file1 = new File(myView.getFile1Text());
 		if (file1.exists() == false) {
 			myMasterController.showDialogError("File does not exist: " + myView.getFile1Text());
@@ -163,23 +207,26 @@ public class Hl7V2FileDiffController {
 		myMessageIter2 = new Hl7InputStreamMessageIterator(myCountingReader2);
 		myMessageIter2.setIgnoreComments(true);
 
+		startComparison("File 1", "File 2");
+	}
+
+	private void startComparison(String label1, String label2) {
 		myCompare = new BulkHl7V2Comparison();
 		myCompare.setStopOnFirstFailure(myView.isStopOnFirstError());
 		myCompare.setExpectedMessages(myMessageIter1);
 		myCompare.setActualMessages(myMessageIter2);
-		myCompare.setExpectedAndActualDescription("File 1", "File 2");
+		myCompare.setExpectedAndActualDescription(label1, label2);
 
 		setRunning(true);
 		setFailed(false);
 		clearOutput();
-		
+
 		myNumMessagesTotal = 0;
 		myNumMessagesFailed = 0;
 		myNumMessagesPassed = 0;
 
 		myThread = new RunningThread();
 		myThread.start();
-
 	}
 
 	private void clearOutput() {
@@ -284,7 +331,7 @@ public class Hl7V2FileDiffController {
 				} catch (HL7Exception e) {
 					ourLog.error("Failed to print structure", e);
 				}
-				
+
 				addOutput(" ");
 				addOutput("Message in file 2:");
 				try {
@@ -292,13 +339,27 @@ public class Hl7V2FileDiffController {
 				} catch (HL7Exception e) {
 					ourLog.error("Failed to print structure", e);
 				}
-				
+
 				addOutput(" ");
 				addOutput("Differences:");
 			}
-			
+
 			String difference = theComparison.describeDifference();
-			addOutput(difference.split("\\n"));
+			String[] lines = difference.split("\\n");
+
+			for (String line : lines) {
+				if (line.contains(myView.getFile1Text()) || line.contains("File 1") || line.contains("Pane 1") || line.contains("Expected")) {
+					addOutput("< " + line);
+				} else if (line.contains(myView.getFile2Text()) || line.contains("File 2") || line.contains("Pane 2") || line.contains("Actual")) {
+					addOutput("> " + line);
+				} else if (line.trim().isEmpty()) {
+					addOutput(line);
+				} else {
+					addOutput("  " + line);
+				}
+			}
+
+			displayVisualDiff(theComparison);
 
 		}
 
@@ -331,6 +392,49 @@ public class Hl7V2FileDiffController {
 
 		public void progressLog(String theMsgLine) {
 //			addOutput(theMsgLine);
+		}
+
+		private void displayVisualDiff(Hl7V2MessageCompare theComparison) {
+			try {
+				String expected = theComparison.getExpectedMessage().encode();
+				String actual = theComparison.getActualMessage().encode();
+
+				String[] expectedLines = expected.split("\r");
+				String[] actualLines = actual.split("\r");
+
+				int maxLines = Math.max(expectedLines.length, actualLines.length);
+				boolean[] differences = new boolean[maxLines];
+
+				for (int i = 0; i < maxLines; i++) {
+					String expLine = i < expectedLines.length ? expectedLines[i] : "";
+					String actLine = i < actualLines.length ? actualLines[i] : "";
+					differences[i] = !expLine.equals(actLine);
+				}
+
+				if (expectedLines.length < maxLines) {
+					expectedLines = Arrays.copyOf(expectedLines, maxLines);
+					for (int i = theComparison.getExpectedMessage().encode().split("\r").length; i < maxLines; i++) {
+						expectedLines[i] = "";
+					}
+				}
+
+				if (actualLines.length < maxLines) {
+					actualLines = Arrays.copyOf(actualLines, maxLines);
+					for (int i = theComparison.getActualMessage().encode().split("\r").length; i < maxLines; i++) {
+						actualLines[i] = "";
+					}
+				}
+
+				final String[] finalExpected = expectedLines;
+				final String[] finalActual = actualLines;
+				final boolean[] finalDifferences = differences;
+
+				SwingUtilities.invokeLater(() -> {
+					myView.getVisualDiffPanel().displayDiff(finalExpected, finalActual, finalDifferences);
+				});
+			} catch (Exception e) {
+				ourLog.error("Failed to display visual diff", e);
+			}
 		}
 
 	}

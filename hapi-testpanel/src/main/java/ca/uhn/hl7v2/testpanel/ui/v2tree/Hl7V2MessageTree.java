@@ -43,33 +43,23 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import javax.swing.DefaultListSelectionModel;
-import javax.swing.Icon;
-import javax.swing.ImageIcon;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.JViewport;
-import javax.swing.ListSelectionModel;
-import javax.swing.SwingUtilities;
-import javax.swing.event.CellEditorListener;
-import javax.swing.event.ChangeEvent;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.TableModel;
-import javax.swing.tree.AbstractLayoutCache;
+import javax.swing.*;
+import javax.swing.event.TreeSelectionEvent;
+import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.DefaultTreeSelectionModel;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
+import javax.swing.tree.TreeSelectionModel;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.Validate;
-import org.netbeans.swing.outline.DefaultOutlineModel;
-import org.netbeans.swing.outline.Outline;
-import org.netbeans.swing.outline.OutlineModel;
-import org.netbeans.swing.outline.RenderDataProvider;
-import org.netbeans.swing.outline.RowModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.awt.BorderLayout;
 
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.conf.ProfileException;
@@ -113,10 +103,10 @@ import ca.uhn.hl7v2.validation.impl.ValidationContextImpl;
  * This is a Swing panel that displays the contents of a Message object in a
  * JTree. The tree currently only expands to the field level (components shown
  * as one node).
- * 
+ *
  * @author Bryan Tripp (bryan_tripp@sourceforge.net)
  */
-public class Hl7V2MessageTree extends Outline implements IDestroyable {
+public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 	private static final DefaultValidation ourDefaultValidation = new DefaultValidation();
 
 	private static final Logger ourLog = LoggerFactory.getLogger(Hl7V2MessageTree.class);
@@ -136,7 +126,7 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 
 	private boolean myShowRep0 = true;
 
-	private TreeRowModel myTableModel;
+	private JTree myTree;
 
 	private TreeNodeRoot myTop;
 
@@ -152,48 +142,41 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 
 	/** Creates new TreePanel */
 	public Hl7V2MessageTree(Controller theController) {
-		addKeyListener(new KeyAdapter() {
+		myController = theController;
+
+		myPipeParser = new PipeParser();
+		myPipeParser.setValidationContext(new ValidationContextImpl());
+
+		setLayout(new BorderLayout());
+
+		myTree = new JTree();
+		myTree.setRootVisible(false);
+		myTree.setRowHeight(20);
+		myTree.setCellRenderer(new Hl7TreeCellRenderer());
+		myTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
+		myTree.addTreeSelectionListener(new TreeSelectionListener() {
+			@Override
+			public void valueChanged(TreeSelectionEvent e) {
+				if (!mySelectionHandlingDisabled) {
+					TreePath path = e.getPath();
+					if (path != null) {
+						handleNewSelectedPath(path);
+					}
+				}
+			}
+		});
+		myTree.addKeyListener(new KeyAdapter() {
 			@Override
 			public void keyPressed(KeyEvent e) {
 				handleKeyPress(e);
 			}
 		});
 
-		setFont(new Font("LUCIDA", Font.PLAIN, 9));
+		myTree.setComponentPopupMenu(createTreeContextMenu());
 
-		myController = theController;
-
-		myPipeParser = new PipeParser();
-		myPipeParser.setValidationContext(new ValidationContextImpl());
-
-		setRenderDataProvider(new TreeRenderDataProvider());
-
-		setShowGrid(true);
-		setGridColor(new Color(0.9f, 0.9f, 0.9f));
-		setRowHeight(16);
-
-		setRowSelectionAllowed(true);
-
-		setSelectionModel(new MySelectionModel());
-
-		ValueCellEditor valueCellEditor = new ValueCellEditor(getFont());
-		setDefaultEditor(String.class, valueCellEditor);
-
-		valueCellEditor.addCellEditorListener(new CellEditorListener() {
-
-			public void editingCanceled(ChangeEvent theE) {
-				ourLog.info("No longer editing");
-				myCurrentlyEditing = false;
-			}
-
-			public void editingStopped(ChangeEvent theE) {
-				ourLog.info("No longer editing");
-				myCurrentlyEditing = false;
-			}
-		});
+		add(new JScrollPane(myTree), BorderLayout.CENTER);
 
 		myHighlitedPathListener = new PropertyChangeListener() {
-
 			public void propertyChange(PropertyChangeEvent theEvt) {
 				if (myController.isMessageEditorInFollowMode()) {
 					if (Hl7V2MessageTree.this.hasFocus() == false) {
@@ -201,31 +184,25 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 					}
 				}
 			}
-
 		};
 
 		myParsedMessagesListener = new PropertyChangeListener() {
-
 			public void propertyChange(PropertyChangeEvent theEvt) {
 				myUpdaterThread.scheduleUpdate();
 			}
 		};
 
 		myValidationContextListener = new PropertyChangeListener() {
-
 			public void propertyChange(PropertyChangeEvent theEvt) {
 				myUpdaterThread.scheduleUpdate();
 			}
 		};
 
 		myMessageEncodingListener = new PropertyChangeListener() {
-
 			public void propertyChange(PropertyChangeEvent theEvt) {
 				myUpdaterThread.scheduleUpdate();
 			}
 		};
-
-		getSelectionModel().setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
 		myUpdaterThread = new UpdaterThread();
 		myUpdaterThread.start();
@@ -283,12 +260,11 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 					ourLog.debug("Open paths are: {}", openPaths);
 					if (openPaths.isEmpty() && myShouldOpenDefaultPaths) {
 						ourLog.info("Opening default paths");
-						final AbstractLayoutCache layout = ((OutlineModel) getModel()).getLayout();
-						for (int row = 0; row < layout.getRowCount(); row++) {
-							TreePath path = layout.getPathForRow(row);
+						for (int row = 0; row < myTree.getRowCount(); row++) {
+							TreePath path = myTree.getPathForRow(row);
 							Object component = path.getLastPathComponent();
 							if (component instanceof TreeNodeMessage || component instanceof TreeNodeUnknown || component instanceof TreeNodeGroup) {
-								expandPath(path);
+								myTree.expandPath(path);
 							}
 						}
 						myShouldOpenDefaultPaths = false;
@@ -553,10 +529,11 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 
 
 	public void collapseAll() {
-		AbstractLayoutCache layout = ((OutlineModel) getModel()).getLayout();
-		for (int i = 0; i < layout.getRowCount(); i++) {
-			TreePath path = layout.getPathForRow(i);
-			collapsePath(path);
+		for (int i = myTree.getRowCount() - 1; i >= 0; i--) {
+			TreePath path = myTree.getPathForRow(i);
+			if (path != null) {
+				myTree.collapsePath(path);
+			}
 		}
 	}
 
@@ -573,21 +550,17 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 			return;
 		}
 
-		final AbstractLayoutCache layout = ((OutlineModel) getModel()).getLayout();
-		int lastSegmentRow = -1;
-		int currentSegmentRow = -1;
-		int currentSelectedRow = -1;
 		int currentMessageIndex = -1;
-		for (int row = 0; row < layout.getRowCount(); row++) {
+		int currentSelectedRow = -1;
+		for (int row = 0; row < myTree.getRowCount(); row++) {
+			TreePath path = myTree.getPathForRow(row);
+			if (path == null) continue;
 
-			TreePath path = layout.getPathForRow(row);
 			Object component = path.getLastPathComponent();
 			if (component instanceof TreeNodeMessage) {
 				currentMessageIndex = ((TreeNodeMessage) component).getMessageIndex();
 				if (highlitedPath.startsWith(currentMessageIndex + "/")) {
-					expandPath(path);
-				} else {
-					// collapsePath(path);
+					myTree.expandPath(path);
 				}
 				continue;
 			}
@@ -596,63 +569,38 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 				continue;
 			}
 
-			if (component instanceof TreeNodeSegment) {
-				lastSegmentRow = row;
-			}
-
-			TreeNodeBase node = (TreeNodeBase) component;
-
-			String terserPath = (currentMessageIndex) + node.getTerserPath();
-			if (highlitedPath != null && highlitedPath.startsWith(terserPath) && !highlitedPath.startsWith(terserPath + "(")) {
-				expandPath(path);
-				if (highlitedPath.equals(terserPath)) {
-					currentSelectedRow = row;
-					getSelectionModel().setSelectionInterval(row, row);
-					currentSegmentRow = lastSegmentRow;
+			if (component instanceof TreeNodeBase) {
+				TreeNodeBase node = (TreeNodeBase) component;
+				String terserPath = (currentMessageIndex) + node.getTerserPath();
+				if (highlitedPath != null && highlitedPath.startsWith(terserPath) && !highlitedPath.startsWith(terserPath + "(")) {
+					myTree.expandPath(path);
+					if (highlitedPath.equals(terserPath)) {
+						currentSelectedRow = row;
+						myTree.setSelectionRow(row);
+					}
 				}
-			} else {
-				// collapsePath(path);
 			}
-
 		}
 
-		// Adjust the tree scrollpane's scroll position so that the newly
-		// selected row is visible
-		if (currentSegmentRow != -1 && currentSelectedRow != -1 && !myRespondingToManualRangeChange) {
-			JViewport viewPort = (JViewport) getParent();
-			final JScrollPane scrollPane = (JScrollPane) viewPort.getParent();
-
-			int tableHeaderHeight = getTableHeader().getHeight();
-
-			int numRowsVisible = ((scrollPane.getHeight() - tableHeaderHeight) / layout.getRowHeight()) - 1;
-			int segmentDelta = currentSelectedRow - currentSegmentRow;
-			if (segmentDelta > numRowsVisible) {
-				currentSegmentRow = currentSegmentRow + (segmentDelta - numRowsVisible);
-			}
-
-			final int scrollToRow = currentSegmentRow;
-			SwingUtilities.invokeLater(new Runnable() {
-				public void run() {
-					scrollPane.getVerticalScrollBar().setValue(layout.getRowHeight() * scrollToRow);
-				}
-			});
-
+		if (currentSelectedRow != -1 && !myRespondingToManualRangeChange) {
+			myTree.scrollRowToVisible(currentSelectedRow);
 		}
 	}
 
 	public void expandAll() {
-		AbstractLayoutCache layout = ((OutlineModel) getModel()).getLayout();
-		for (int i = 0; i < layout.getRowCount(); i++) {
-			TreePath path = layout.getPathForRow(i);
-			expandPath(path);
+		for (int i = 0; i < myTree.getRowCount(); i++) {
+			TreePath path = myTree.getPathForRow(i);
+			if (path != null) {
+				myTree.expandPath(path);
+			}
 		}
 	}
 
 	private void expandPaths(Set<String> theOpenPaths, String theSelectedPath) {
-		AbstractLayoutCache layout = ((OutlineModel) getModel()).getLayout();
 		int messageIndex = -1;
-		for (int i = 0; i < layout.getRowCount(); i++) {
-			TreePath path = layout.getPathForRow(i);
+		for (int i = 0; i < myTree.getRowCount(); i++) {
+			TreePath path = myTree.getPathForRow(i);
+			if (path == null) continue;
 
 			Object baseObj = path.getLastPathComponent();
 			String pathString = null;
@@ -665,12 +613,12 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 
 			if (pathString != null) {
 				if (theOpenPaths.contains(pathString)) {
-					expandPath(path);
+					myTree.expandPath(path);
 				} else {
-					collapsePath(path);
+					myTree.collapsePath(path);
 				}
 				if (pathString.equals(theSelectedPath)) {
-					getSelectionModel().setSelectionInterval(i, i);
+					myTree.setSelectionRow(i);
 				}
 			}
 
@@ -681,25 +629,22 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 	private Set<String> getOpenPaths() {
 		Set<String> retVal = new HashSet<String>();
 
-		TableModel model = getModel();
-		AbstractLayoutCache layout = ((OutlineModel) model).getLayout();
 		int messageIndex = -1;
-		for (int i = 0; i < layout.getRowCount(); i++) {
-			TreePath path = layout.getPathForRow(i);
+		for (int i = 0; i < myTree.getRowCount(); i++) {
+			TreePath path = myTree.getPathForRow(i);
+			if (path == null) continue;
 
 			Object baseObj = path.getLastPathComponent();
 			if (baseObj instanceof TreeNodeMessage || baseObj instanceof TreeNodeUnknown) {
 
 				messageIndex++;
 
-				if (layout.getExpandedState(path)) {
+				if (myTree.isExpanded(path)) {
 					retVal.add(Integer.toString(messageIndex));
 				}
 
-			} else {
-
-				baseObj = path.getPathComponent(path.getPathCount() - 2);
-				if (baseObj instanceof TreeNodeBase) {
+			} else if (baseObj instanceof TreeNodeBase) {
+				if (myTree.isExpanded(path)) {
 					retVal.add(Integer.toString(messageIndex) + ((TreeNodeBase) baseObj).getTerserPath());
 				}
 			}
@@ -711,10 +656,10 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 
 	private String getPathAtRow(int theRowIndex) {
 
-		AbstractLayoutCache layout = ((OutlineModel) getModel()).getLayout();
 		int messageIndex = -1;
-		for (int i = 0; i < layout.getRowCount(); i++) {
-			TreePath path = layout.getPathForRow(i);
+		for (int i = 0; i < myTree.getRowCount(); i++) {
+			TreePath path = myTree.getPathForRow(i);
+			if (path == null) continue;
 
 			Object baseObj = path.getLastPathComponent();
 			if (baseObj instanceof TreeNodeMessage || baseObj instanceof TreeNodeUnknown) {
@@ -746,19 +691,388 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 	}
 
 	private void handleKeyPress(KeyEvent theE) {
-		int row = getSelectedRow();
-		if (row == -1) {
+		// Tree doesn't support in-place editing in the same way; no-op for now
+	}
+
+	private JPopupMenu createTreeContextMenu() {
+		JPopupMenu menu = new JPopupMenu();
+		JMenuItem editMenuItem = new JMenuItem("Edit...");
+		editMenuItem.addActionListener(e -> handleEditMenuClick());
+		menu.add(editMenuItem);
+		return menu;
+	}
+
+	private void handleEditMenuClick() {
+		int selectedRow = myTree.getLeadSelectionRow();
+		if (selectedRow < 0) {
 			return;
 		}
 
-		if (theE.getKeyCode() == KeyEvent.VK_ENTER || theE.getKeyCode() == KeyEvent.VK_F2) {
-			AbstractLayoutCache layout = ((OutlineModel) getModel()).getLayout();
-			TreePath path = layout.getPathForRow(row);
-			TreeNodeBase baseObj = (TreeNodeBase) path.getLastPathComponent();
-			if (myTableModel.isCellEditable(baseObj, TreeRowModel.COL_VALUE)) {
-				editCellAt(row, TreeRowModel.COL_VALUE + 1);
-				theE.consume();
+		TreePath path = myTree.getPathForRow(selectedRow);
+		if (path == null) {
+			return;
+		}
+
+		Object component = path.getLastPathComponent();
+		if (component instanceof TreeNodeType) {
+			TreeNodeType node = (TreeNodeType) component;
+			showEditDialog(node);
+		} else if (component instanceof TreeNodeSegment) {
+			// Could add segment editing here in the future
+			javax.swing.JOptionPane.showMessageDialog(myTree, "Segment editing not yet supported", "Info", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+		}
+	}
+
+	private void showEditDialog(TreeNodeType node) {
+		Type type = node.getType();
+		String fieldName = node.getName();
+
+		String newValue = null;
+		if (type instanceof Composite) {
+			newValue = showEditCompositeDialog(fieldName, (Composite) type);
+		} else {
+			String currentValue = node.getPipeEncodedValue();
+			newValue = showEditValueDialog(fieldName, currentValue, type);
+		}
+
+		if (newValue != null) {
+			try {
+				if (type instanceof Composite) {
+					// Composite was already updated in the dialog
+					newValue = node.getPipeEncodedValue();
+				} else if (!newValue.equals(node.getPipeEncodedValue())) {
+					updateNodeValue(node, newValue);
+				} else {
+					return; // No change
+				}
+
+				// Find the message this node belongs to and update it
+				TreeNodeBase base = node;
+				while (!(base instanceof TreeNodeMessage)) {
+					base = (TreeNodeBase) base.getParent();
+				}
+
+				if (base instanceof TreeNodeMessage) {
+					TreeNodeMessage msgNode = (TreeNodeMessage) base;
+					int messageIndex = msgNode.getMessageIndex();
+					Message msg = type.getMessage();
+
+					// This syncs the parsed message back to source and triggers the display update
+					myMessages.updateSourceMessageBasedOnParsedMessage(messageIndex, msg);
+				}
+
+				myUpdaterThread.scheduleUpdateNow();
+			} catch (Exception e) {
+				ourLog.error("Failed to update node value", e);
+				javax.swing.JOptionPane.showMessageDialog(myTree, "Failed to update value: " + e.getMessage(), "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
 			}
+		}
+	}
+
+	private String showEditCompositeDialog(String fieldName, Composite composite) {
+		javax.swing.JDialog dialog = new javax.swing.JDialog();
+		dialog.setTitle("Edit: " + fieldName);
+		dialog.setDefaultCloseOperation(javax.swing.JDialog.DISPOSE_ON_CLOSE);
+		dialog.setModal(true);
+		dialog.setLocationRelativeTo(myTree);
+
+		javax.swing.JPanel mainPanel = new javax.swing.JPanel();
+		mainPanel.setLayout(new java.awt.BorderLayout());
+		mainPanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+		// Header panel with field info
+		javax.swing.JPanel headerPanel = new javax.swing.JPanel();
+		headerPanel.setLayout(new java.awt.BorderLayout());
+		headerPanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 10, 0));
+		javax.swing.JLabel headerLabel = new javax.swing.JLabel("<html><b>" + fieldName + "</b> (" + composite.getClass().getSimpleName() + ")</html>");
+		headerPanel.add(headerLabel, java.awt.BorderLayout.WEST);
+		mainPanel.add(headerPanel, java.awt.BorderLayout.NORTH);
+
+		// Scrollable components panel
+		javax.swing.JPanel scrollablePanel = new javax.swing.JPanel();
+		scrollablePanel.setLayout(new java.awt.GridBagLayout());
+
+		java.awt.GridBagConstraints gbc = new java.awt.GridBagConstraints();
+		gbc.anchor = java.awt.GridBagConstraints.NORTHWEST;
+		gbc.insets = new java.awt.Insets(8, 0, 8, 10);
+
+		Type[] components = composite.getComponents();
+		javax.swing.JTextField[] componentFields = new javax.swing.JTextField[components.length];
+
+		for (int i = 0; i < components.length; i++) {
+			Type component = components[i];
+			int position = i + 1;
+			String componentName = "Component " + position;
+			String componentType = component != null ? component.getClass().getSimpleName() : "Unknown";
+
+			// Try to get name from conformance profile first
+			if (composite instanceof ConformanceComposite) {
+				ConformanceComposite confComposite = (ConformanceComposite) composite;
+				try {
+					String confName = confComposite.getName(position);
+					if (confName != null && !confName.isEmpty()) {
+						componentName = confName;
+					}
+				} catch (Exception e) {
+					// Use default
+				}
+			}
+
+			// If still default, try to extract from getter methods via reflection
+			if (componentName.startsWith("Component")) {
+				try {
+					java.lang.reflect.Method[] methods = composite.getClass().getDeclaredMethods();
+
+					for (java.lang.reflect.Method method : methods) {
+						String methodName = method.getName();
+						// Match pattern like "get[Type][Position]_[Description]"
+						if (methodName.matches("get.*" + position + "_.*")) {
+							// Extract the description part after the underscore
+							String[] parts = methodName.split("_");
+							if (parts.length > 1) {
+								String desc = parts[1];
+								// Convert camelCase to readable text
+								desc = desc.replaceAll("([a-z])([A-Z])", "$1 $2");
+								componentName = desc;
+								break;
+							}
+						}
+					}
+				} catch (Exception e) {
+					// Use default
+				}
+			}
+
+			// Try to get name from the component itself as fallback
+			if (componentName.startsWith("Component")) {
+				if (component != null) {
+					try {
+						String typeName = component.getName();
+						if (typeName != null && !typeName.isEmpty()) {
+							componentName = typeName;
+						}
+					} catch (Exception e) {
+						// Use default
+					}
+				}
+			}
+
+			// Add label with position, name, and type
+			gbc.gridx = 0;
+			gbc.gridy = i;
+			gbc.gridwidth = 1;
+			gbc.weightx = 0.0;
+			gbc.fill = java.awt.GridBagConstraints.NONE;
+			gbc.insets = new java.awt.Insets(8, 0, 8, 10);
+
+			String labelText = "<html><b>" + position + ".</b> " + componentName + "<br/><font color='#666666' size='-1'>(" + componentType + ")</font></html>";
+			scrollablePanel.add(new javax.swing.JLabel(labelText), gbc);
+
+			// Add text field next to label
+			gbc.gridx = 1;
+			gbc.weightx = 1.0;
+			gbc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+			gbc.insets = new java.awt.Insets(8, 0, 8, 0);
+
+			componentFields[i] = new javax.swing.JTextField(30);
+			componentFields[i].setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 11));
+
+			// Get current value for this component
+			try {
+				String value = component.encode();
+				componentFields[i].setText(value != null ? value : "");
+			} catch (Exception e) {
+				ourLog.warn("Could not encode component", e);
+			}
+
+			scrollablePanel.add(componentFields[i], gbc);
+		}
+
+		// Add scrollable panel to main panel
+		javax.swing.JScrollPane scrollPane = new javax.swing.JScrollPane(scrollablePanel);
+		mainPanel.add(scrollPane, java.awt.BorderLayout.CENTER);
+
+		// Button panel
+		javax.swing.JPanel buttonPanel = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 5, 5));
+		buttonPanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 0, 0, 0));
+		javax.swing.JButton okButton = new javax.swing.JButton("OK");
+		javax.swing.JButton cancelButton = new javax.swing.JButton("Cancel");
+
+		final boolean[] result = new boolean[1];
+
+		okButton.addActionListener(e -> {
+			try {
+				// Update each component with the new value
+				for (int i = 0; i < components.length; i++) {
+					String newValue = componentFields[i].getText();
+					Type component = components[i];
+
+					if (component instanceof Primitive) {
+						((Primitive) component).setValue(newValue);
+					} else {
+						// For nested composites, parse the value
+						EncodingCharacters enc;
+						try {
+							enc = EncodingCharacters.getInstance(component.getMessage());
+						} catch (HL7Exception ex) {
+							enc = new EncodingCharacters('|', null);
+						}
+						component.clear();
+						myPipeParser.parse(component, newValue, enc);
+					}
+				}
+				result[0] = true;
+				dialog.dispose();
+			} catch (Exception ex) {
+				ourLog.error("Failed to update composite", ex);
+				javax.swing.JOptionPane.showMessageDialog(dialog, "Failed to update: " + ex.getMessage(), "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
+			}
+		});
+
+		cancelButton.addActionListener(e -> {
+			result[0] = false;
+			dialog.dispose();
+		});
+
+		okButton.setPreferredSize(new java.awt.Dimension(75, 30));
+		cancelButton.setPreferredSize(new java.awt.Dimension(75, 30));
+		buttonPanel.add(okButton);
+		buttonPanel.add(cancelButton);
+		mainPanel.add(buttonPanel, java.awt.BorderLayout.SOUTH);
+
+		dialog.getContentPane().add(mainPanel);
+		dialog.setSize(700, Math.min(150 + (components.length * 50), 600));
+		dialog.setVisible(true);
+
+		return result[0] ? "composite_updated" : null;
+	}
+
+	private String showEditValueDialog(String fieldName, String currentValue, Type type) {
+		javax.swing.JDialog dialog = new javax.swing.JDialog();
+		dialog.setTitle("Edit: " + fieldName);
+		dialog.setDefaultCloseOperation(javax.swing.JDialog.DISPOSE_ON_CLOSE);
+		dialog.setModal(true);
+		dialog.setLocationRelativeTo(myTree);
+
+		javax.swing.JPanel panel = new javax.swing.JPanel();
+		panel.setLayout(new java.awt.GridBagLayout());
+		panel.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+		java.awt.GridBagConstraints gbc = new java.awt.GridBagConstraints();
+		gbc.gridx = 0;
+		gbc.gridy = 0;
+		gbc.anchor = java.awt.GridBagConstraints.WEST;
+		gbc.insets = new java.awt.Insets(0, 0, 5, 10);
+		panel.add(new javax.swing.JLabel("Value:"), gbc);
+
+		javax.swing.JTextArea textArea = new javax.swing.JTextArea(5, 40);
+		textArea.setText(currentValue != null ? currentValue : "");
+		textArea.setLineWrap(true);
+		textArea.setWrapStyleWord(true);
+		textArea.setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 12));
+
+		gbc.gridx = 1;
+		gbc.gridy = 0;
+		gbc.fill = java.awt.GridBagConstraints.BOTH;
+		gbc.weightx = 1.0;
+		gbc.weighty = 1.0;
+		panel.add(new javax.swing.JScrollPane(textArea), gbc);
+
+		gbc.gridx = 0;
+		gbc.gridy = 1;
+		gbc.gridwidth = 2;
+		gbc.anchor = java.awt.GridBagConstraints.EAST;
+		gbc.fill = java.awt.GridBagConstraints.NONE;
+		gbc.weightx = 0;
+		gbc.weighty = 0;
+		gbc.insets = new java.awt.Insets(10, 0, 0, 0);
+
+		javax.swing.JPanel buttonPanel = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 5, 0));
+		javax.swing.JButton okButton = new javax.swing.JButton("OK");
+		javax.swing.JButton cancelButton = new javax.swing.JButton("Cancel");
+
+		final String[] result = new String[1];
+
+		okButton.addActionListener(e -> {
+			result[0] = textArea.getText();
+			dialog.dispose();
+		});
+
+		cancelButton.addActionListener(e -> {
+			result[0] = null;
+			dialog.dispose();
+		});
+
+		buttonPanel.add(okButton);
+		buttonPanel.add(cancelButton);
+		panel.add(buttonPanel, gbc);
+
+		dialog.getContentPane().add(panel);
+		dialog.setSize(500, 300);
+		dialog.setVisible(true);
+
+		return result[0];
+	}
+
+	private void updateNodeValue(TreeNodeType node, String newValue) throws HL7Exception {
+		Type type = node.getType();
+		if (type instanceof Primitive) {
+			Primitive primitive = (Primitive) type;
+			if (node.isMsh1orMsh2()) {
+				// MSH-1 and MSH-2 are special cases and not parsed normally
+				primitive.setValue(newValue);
+			} else {
+				// Parse the new value properly (handles escaping, etc.)
+				EncodingCharacters enc;
+				try {
+					enc = EncodingCharacters.getInstance(type.getMessage());
+				} catch (HL7Exception e) {
+					ourLog.error("Could not get encoding chars", e);
+					enc = new EncodingCharacters('|', null);
+				}
+				type.clear();
+				myPipeParser.parse(type, newValue, enc);
+			}
+		} else {
+			throw new HL7Exception("Cannot edit composite types yet");
+		}
+	}
+
+	private void handleNewSelectedPath(TreePath path) {
+		if (mySelectionHandlingDisabled) {
+			return;
+		}
+
+		if (myCurrentlyEditing) {
+			ourLog.info("Not responding to new selection because we are marked as editing right now");
+			return;
+		}
+
+		if (path == null) {
+			return;
+		}
+
+		DefaultMutableTreeNode lead = (DefaultMutableTreeNode) path.getLastPathComponent();
+		if (lead instanceof TreeNodeSegment) {
+			TreeNodeSegment segmentNode = (TreeNodeSegment) lead;
+			ourLog.info("Selected segment: " + segmentNode.getTerserPath());
+			myMessages.setHighlitedRangeBasedOnSegment(segmentNode.getSegment());
+		} else if (lead instanceof TreeNodeGroup) {
+			TreeNodeGroup type = (TreeNodeGroup) lead;
+			ourLog.info("Selected group: " + type.getTerserPath());
+			try {
+				List<Segment> segments = type.getSegments();
+				myMessages.setHighlitedRangeBasedOnSegment(segments.toArray(new Segment[segments.size()]));
+			} catch (HL7Exception e) {
+				e.printStackTrace();
+			}
+		} else if (lead instanceof TreeNodeType) {
+			TreeNodeType type = (TreeNodeType) lead;
+			ourLog.info("Selected field: " + type.getTerserPath());
+			myMessages.setHighlitedRangeBasedOnField(type.getSegmentAndComponentPath());
+		} else {
+			ourLog.info("Selected node: " + lead.getClass().getSimpleName());
+			myMessages.clearHighlight();
 		}
 	}
 
@@ -773,28 +1087,16 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 			return;
 		}
 
-		AbstractLayoutCache layout = ((OutlineModel) getModel()).getLayout();
-		TreePath path = layout.getPathForRow(theNewIndex);
-
-		DefaultMutableTreeNode lead = (DefaultMutableTreeNode) path.getLastPathComponent();
-		if (lead instanceof TreeNodeSegment) {
-			TreeNodeSegment segmentNode = (TreeNodeSegment) lead;
-			myMessages.setHighlitedRangeBasedOnSegment(segmentNode.getSegment());
-		} else if (lead instanceof TreeNodeGroup) {
-			TreeNodeGroup type = (TreeNodeGroup) lead;
-			try {
-				List<Segment> segments = type.getSegments();
-				myMessages.setHighlitedRangeBasedOnSegment(segments.toArray(new Segment[segments.size()]));
-			} catch (HL7Exception e) {
-				e.printStackTrace();
-			}
-		} else if (lead instanceof TreeNodeType) {
-			TreeNodeType type = (TreeNodeType) lead;
-			myMessages.setHighlitedRangeBasedOnField(type.getSegmentAndComponentPath());
-		} else {
-			myMessages.clearHighlight();
+		TreePath path = myTree.getPathForRow(theNewIndex);
+		if (path == null) {
+			return;
 		}
 
+		handleNewSelectedPath(path);
+	}
+
+	private int getSelectedRow() {
+		return myTree.getLeadSelectionRow();
 	}
 
 	private void removeMessageListeners() {
@@ -810,10 +1112,6 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 		myUpdaterThread.scheduleUpdate();
 	}
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
 	public void setEditingRow(int theARow) {
 		if (theARow == -1) {
 			myCurrentlyEditing = false;
@@ -821,7 +1119,6 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 			ourLog.info("Beginning editing row " + theARow);
 			myCurrentlyEditing = true;
 		}
-		super.setEditingRow(theARow);
 	}
 
 	public void setEditorShowModeAndUpdateAccordingly(ShowEnum theValue) {
@@ -848,52 +1145,15 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 		myTop = new TreeNodeRoot();
 		myTreeModel = new DefaultTreeModel(myTop, false);
 
-		myTableModel = new TreeRowModel(myTreeModel);
-		OutlineModel outlineModel = DefaultOutlineModel.createOutlineModel(myTreeModel, myTableModel);
-		setModel(outlineModel);
-
-		setRootVisible(false);
-
-		setDefaultRenderer(NodeValidationFailure.class, new ValidationTreeCellRenderer());
-
-		// Volumn index is off by one because of the tree
-		getColumnModel().getColumn(TreeRowModel.COL_VALUE + 1).setCellRenderer(new ValueCellRenderer(this));
-
-		updateUI();
+		myTree.setModel(myTreeModel);
 
 		myUpdaterThread.scheduleUpdateNow();
 
-		SwingUtilities.invokeLater(new Runnable() {
+	}
 
-			public void run() {
-				int width = getWidth() - 140;
-
-				getColumnModel().getColumn(0).setPreferredWidth(width / 2);
-
-				// Min
-				getColumnModel().getColumn(1).setPreferredWidth(35);
-				getColumnModel().getColumn(1).setMinWidth(35);
-				getColumnModel().getColumn(1).setMaxWidth(35);
-
-				// Max
-				getColumnModel().getColumn(2).setPreferredWidth(35);
-				getColumnModel().getColumn(2).setMinWidth(35);
-				getColumnModel().getColumn(2).setMaxWidth(35);
-
-				// Length
-				getColumnModel().getColumn(3).setPreferredWidth(50);
-				getColumnModel().getColumn(3).setMinWidth(50);
-				getColumnModel().getColumn(3).setMaxWidth(50);
-
-				// Validated
-				getColumnModel().getColumn(4).setPreferredWidth(20);
-				getColumnModel().getColumn(4).setMinWidth(20);
-				getColumnModel().getColumn(4).setMaxWidth(20);
-
-				getColumnModel().getColumn(5).setPreferredWidth(width / 2);
-			}
-		});
-
+	void setTreeModel(DefaultTreeModel theModel) {
+		myTreeModel = theModel;
+		myTree.setModel(theModel);
 	}
 
 	void setMessageForUnitTest(Hl7V2MessageCollection theMessageModel) {
@@ -917,7 +1177,7 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 		myWorkingListener = theWorkingListener;
 	}
 
-	private void synchronizeTreeWithHighlitedPath() {
+	public void synchronizeTreeWithHighlitedPath() {
 		try {
 			mySelectionHandlingDisabled = true;
 			doSynchronizeTreeWithHighlitedPath();
@@ -1012,30 +1272,57 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 
 	}
 
+	private class Hl7TreeCellRenderer extends DefaultTreeCellRenderer {
+		@Override
+		public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean expanded,
+				boolean leaf, int row, boolean hasFocus) {
+			super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus);
+			if (value instanceof TreeNodeMessage) {
+				TreeNodeMessage tnm = (TreeNodeMessage) value;
+				setText("<html>" + tnm.getMessage().getMessageDescription() + "</html>");
+				setIcon(ImageFactory.getTreeBundle());
+			} else if (value instanceof TreeNodeBase) {
+				TreeNodeBase node = (TreeNodeBase) value;
+				setText("<html>" + node.getNodeText().toString() + "</html>");
+				if (node instanceof TreeNodeGroup) {
+					setIcon(ImageFactory.getTreeBundle());
+				} else if (node instanceof TreeNodeSegment) {
+					setIcon(ImageFactory.getTreeLeaf());
+				} else if (node.getChildCount() > 0) {
+					setIcon(ImageFactory.getTreeBundle());
+				} else {
+					setIcon(ImageFactory.getTreeLeaf());
+				}
+			}
+
+			if (selected) {
+				setForeground(Color.WHITE);
+			} else {
+				setForeground(Color.BLACK);
+			}
+			return this;
+		}
+	}
+
 	/**
-	 * Not sure if it's a bug in outline or what, but this seems to be the only
-	 * way to reliably know what row is selected
+	 * Custom selection model for JTree that hooks selection changes to handleNewSelectedIndex
 	 */
-	public class MySelectionModel extends DefaultListSelectionModel {
-
-		public void addSelectionInterval(int theIndex0, int theIndex1) {
-			// ignore
-		}
-
-		public void removeSelectionInterval(int theIndex0, int theIndex1) {
-			// ignore
-		}
-
-		public void setSelectionInterval(int theIndex0, int theIndex1) {
+	public class MySelectionModel extends DefaultTreeSelectionModel {
+		@Override
+		public void setSelectionPath(TreePath path) {
 			myRespondingToManualRangeChange = true;
 			try {
-				handleNewSelectedIndex(theIndex0);
-				super.setSelectionInterval(theIndex0, theIndex1);
+				super.setSelectionPath(path);
+				if (path != null) {
+					int row = myTree.getRowForPath(path);
+					if (row >= 0) {
+						handleNewSelectedIndex(row);
+					}
+				}
 			} finally {
 				myRespondingToManualRangeChange = false;
 			}
 		}
-
 	}
 
 	private class NodeValidationFailure {
@@ -1137,6 +1424,20 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 
 		public String getDisplayName() {
 			return null;
+		}
+
+		public String getNodeCode() {
+			return myName != null ? myName : "";
+		}
+
+		@Override
+		public String toString() {
+			String name = myName != null ? myName : "";
+			String displayName = getDisplayName();
+			if (displayName != null && !displayName.isEmpty()) {
+				return name + ": " + displayName;
+			}
+			return name;
 		}
 
 		/**
@@ -1967,6 +2268,13 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 			myComponentPath = new ArrayList<Integer>(theComponentPath);
 		}
 
+		@Override
+		public String getDisplayName() {
+			// The field name/description is stored in myName from the constructor's theGroupName parameter
+			// This gets passed through the parent TreeNodeBase constructor
+			return getName();
+		}
+
 		protected String getDataTypeDescription() {
 			return getType().getClass().getSimpleName();
 		}
@@ -1975,8 +2283,6 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 			StringBuilder b = new StringBuilder();
 
 			b.append(myParentName);
-			// b.append(" ");
-			// b.append(getName());
 
 			if (isRepeating() && (myShowRep0 || getRepNum() > 0)) {
 				b.append("<font color=\"" + COLOR_REPNUM + "\">");
@@ -1990,11 +2296,23 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 			}
 
 			b.append("<font color=\"#00A000\">");
-			if (StringUtils.isNotBlank(getDisplayName())) {
+
+			// Try to get component name from display name
+			String displayName = getDisplayName();
+			if (StringUtils.isNotBlank(displayName)) {
 				b.append(" - ");
-				b.append(getDisplayName());
+				b.append(displayName);
 				b.append(" ");
+			} else if (myComponentPath.size() > 1) {
+				// For components without a display name, try to extract from parent composite
+				String componentName = extractComponentName();
+				if (StringUtils.isNotBlank(componentName)) {
+					b.append(" - ");
+					b.append(componentName);
+					b.append(" ");
+				}
 			}
+
 			b.append(" (");
 			b.append(getDataTypeDescription());
 			b.append(")");
@@ -2002,6 +2320,47 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 
 			return b;
 		}
+
+		private String extractComponentName() {
+			try {
+				// Get the parent composite
+				if (myComponentPath.size() < 2) {
+					return null;
+				}
+
+				int componentPosition = myComponentPath.get(myComponentPath.size() - 1);
+				Type parentType = getType();
+
+				// Walk up to find the composite
+				Object current = getParent();
+				while (current instanceof TreeNodeType) {
+					TreeNodeType nodeParent = (TreeNodeType) current;
+					Type type = nodeParent.getType();
+					if (type instanceof Composite) {
+						Composite composite = (Composite) type;
+						java.lang.reflect.Method[] methods = composite.getClass().getDeclaredMethods();
+
+						for (java.lang.reflect.Method method : methods) {
+							String methodName = method.getName();
+							if (methodName.matches("get.*" + componentPosition + "_.*")) {
+								String[] parts = methodName.split("_");
+								if (parts.length > 1) {
+									String desc = parts[1];
+									desc = desc.replaceAll("([a-z])([A-Z])", "$1 $2");
+									return desc;
+								}
+							}
+						}
+						break;
+					}
+					current = nodeParent.getParent();
+				}
+			} catch (Exception e) {
+				// Use default
+			}
+			return null;
+		}
+
 
 		/**
 		 * {@inheritDoc}
@@ -2103,251 +2462,6 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 
 	}
 
-	private static class TreeRenderDataProvider implements RenderDataProvider {
-
-		private static final Color ourFgEmpty = new Color(0.5f, 0.5f, 0.5f);
-		private static final Color ourFgGroup = new Color(0.4f, 0.4f, 0.0f);
-		private static final Color ourFgNormal = new Color(0.0f, 0.0f, 0.0f);
-		private static final Color ourFgSegment = new Color(0.0f, 0.0f, 0.0f);
-
-		public Color getBackground(Object theArg0) {
-			return Color.white;
-		}
-
-		public String getDisplayName(Object theObject) {
-			if (theObject instanceof TreeNodeMessage) {
-
-				TreeNodeMessage tnm = (TreeNodeMessage) theObject;
-				return (tnm.getMessage().getMessageDescription());
-
-			} else if (theObject instanceof TreeNodeBase) {
-
-				TreeNodeBase base = (TreeNodeBase) theObject;
-				return (base.getNodeText().toString());
-
-			} else {
-
-				return "Unknown: " + theObject.getClass().getName();
-
-			}
-		}
-
-		public Color getForeground(Object theArg0) {
-			if (theArg0 instanceof TreeNodeBase) {
-				if (Boolean.FALSE == ((TreeNodeBase) theArg0).isHasContent()) {
-					return ourFgEmpty;
-				}
-			}
-			if (theArg0 instanceof TreeNodeGroup) {
-				return ourFgGroup;
-			}
-			if (theArg0 instanceof TreeNodeSegment) {
-				return ourFgSegment;
-			}
-			return ourFgNormal;
-		}
-
-		public Icon getIcon(Object theArg0) {
-			if (theArg0 instanceof TreeNodeGroup) {
-				return ImageFactory.getTreeBundle();
-			} else if (theArg0 instanceof TreeNodeSegment) {
-				return ImageFactory.getTreeLeaf();
-			} else {
-				return new ImageIcon();
-			}
-		}
-
-		public String getTooltipText(Object theArg0) {
-			return null;
-		}
-
-		public boolean isHtmlDisplayName(Object theArg0) {
-			return true;
-		}
-
-	}
-
-	private class TreeRowModel implements RowModel {
-
-		private static final int COL_LENGTH = 2;
-		private static final int COL_MAX = 1;
-		private static final int COL_MIN = 0;
-		private static final int COL_VALIDATED = 3;
-		private static final int COL_VALUE = 4;
-
-		private static final int NUM_COLS = 5;
-
-		public TreeRowModel(DefaultTreeModel theModel) {
-			myTreeModel = theModel;
-		}
-
-		public Class<?> getColumnClass(int theArg0) {
-			if (theArg0 == COL_VALIDATED) {
-				return NodeValidationFailure.class;
-			}
-			return String.class;
-		}
-
-		public int getColumnCount() {
-			return NUM_COLS;
-		}
-
-		public String getColumnName(int theArg0) {
-			switch (theArg0) {
-			case COL_MIN:
-				return "Min";
-			case COL_MAX:
-				return "Max";
-			case COL_VALIDATED:
-				return "";
-			case COL_LENGTH:
-				return "Length";
-			case COL_VALUE:
-			default:
-				return "Value (Click to Edit)";
-			}
-		}
-
-		public Object getValueFor(Object theObject, int theCol) {
-			TreeNodeBase obj = (TreeNodeBase) theObject;
-			switch (theCol) {
-			case COL_VALUE: {
-				return obj;
-			}
-			case COL_MIN:
-				if (obj.getMinReps() == null) {
-					return null;
-				} else {
-					return obj.getMinReps();
-				}
-			case COL_MAX:
-				if (obj.getMaxReps() == null) {
-					return null;
-				} else if (obj.getMaxReps() == -1) {
-					return "*";
-				} else {
-					return obj.getMaxReps();
-				}
-			case COL_LENGTH:
-				return obj.getMaxLength();
-			case COL_VALIDATED:
-				// if (myMessages.getValidationContext() == null) {
-				// return new NodeValidationFailure(new ImageIcon(), "");
-				// } else
-				if (obj.isContainError()) {
-					if (obj.getErrorDescription() != null) {
-						return new NodeValidationFailure(ImageFactory.getValFailed(), obj.getErrorDescription());
-					} else {
-						return new NodeValidationFailure(ImageFactory.getValFailedChild(), "Child element has validation failure");
-					}
-				} else {
-					return new NodeValidationFailure(new ImageIcon(), "");
-				}
-			default:
-				return "";
-			}
-		}
-
-		public boolean isCellEditable(Object theValue, int theColumn) {
-			if (theColumn == COL_VALUE) {
-				if (theValue instanceof TreeNodeSegment) {
-					return true;
-				}
-				if (theValue instanceof TreeNodeType) {
-					return true;
-				}
-			}
-			return false;
-		}
-
-		private void parse(Segment theSegment, String theNewValue) throws HL7Exception {
-			EncodingCharacters enc;
-			try {
-				enc = EncodingCharacters.getInstance(theSegment.getMessage());
-			} catch (HL7Exception e) {
-				ourLog.error("Could not get encoding chars", e);
-				enc = new EncodingCharacters('|', null);
-			}
-
-			myPipeParser.parse(theSegment, theNewValue, enc);
-		}
-
-		private void parse(Type theType, String theNewValue) throws HL7Exception {
-			EncodingCharacters enc;
-			try {
-				enc = EncodingCharacters.getInstance(theType.getMessage());
-			} catch (HL7Exception e) {
-				ourLog.error("Could not get encoding chars", e);
-				enc = new EncodingCharacters('|', null);
-			}
-
-			theType.clear();
-			myPipeParser.parse(theType, theNewValue, enc);
-
-		}
-
-		public void setValueFor(Object theObject, int theCol, Object theNewValue) {
-			if (theCol != COL_VALUE) {
-				return;
-			}
-
-			Message msg = null;
-			String newValue = (String) theNewValue;
-			if (theObject instanceof TreeNodeSegment) {
-				try {
-					Segment segment = ((TreeNodeSegment) theObject).getSegment();
-					parse(segment, newValue);
-					msg = segment.getMessage();
-				} catch (HL7Exception e) {
-					ourLog.error("Could not set value: " + theNewValue, e);
-					return;
-				}
-			} else if (theObject instanceof TreeNodeType) {
-				try {
-					TreeNodeType type = ((TreeNodeType) theObject);
-
-					if (!myController.validateNewValue(type.getTerserPath(), newValue)) {
-						return;
-					}
-
-					if (type.isMsh1orMsh2()) {
-						((Primitive) type.getType()).setValue(newValue);
-					} else {
-						parse(type.getType(), newValue);
-					}
-
-					msg = type.getType().getMessage();
-
-				} catch (HL7Exception e) {
-					ourLog.error("Could not set value: " + theNewValue, e);
-					return;
-				}
-			} else {
-				return;
-			}
-
-			if (msg != null) {
-
-				TreeNodeBase base = (TreeNodeBase) theObject;
-				while (!(base instanceof TreeNodeMessage)) {
-					base = (TreeNodeBase) base.getParent();
-				}
-
-				int messageIndex = ((TreeNodeMessage) base).getMessageIndex();
-				myMessages.updateSourceMessageBasedOnParsedMessage(messageIndex, msg);
-			}
-
-			/*
-			 * After making a change, the underlying collection may reparse the
-			 * entire message which will invalidate the references to various
-			 * structures held by my tree
-			 */
-			myUpdaterThread.scheduleUpdateNow();
-
-		}
-
-	}
-
 	private class UpdaterThread extends Thread {
 		private long myNextUpdate = 0;
 
@@ -2368,55 +2482,29 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 					}
 
 					if (myNextUpdate > 0 && myNextUpdate <= System.currentTimeMillis()) {
-						ourLog.info("Running an update of the Message Tree");
 
-						addChildren();
-
-						int messages = myTop.countMessages();
-
-						final StringBuilder b = new StringBuilder();
-						b.append(messages > 0 ? messages : "No");
-						b.append(" message");
-						b.append(messages != 1 ? "s" : "");
-						if (myMessages.isValidating()) {
-							b.append(", ");
-							int countExceptions = myTop.countExceptions();
-							b.append(countExceptions > 0 ? countExceptions : "No");
-							b.append(" problem");
-							b.append(countExceptions != 1 ? "s" : "");
+						try {
+							addChildren();
+						} catch (InterruptedException e) {
+							ourLog.info("Interrupted during addChildren");
+						} catch (InvocationTargetException e) {
+							ourLog.error("Error during addChildren", e);
 						}
 
+						int messages = myTop.countMessages();
+						int exceptions = myTop.countExceptions();
+
 						if (myWorkingListener != null) {
-							EventQueue.invokeAndWait(new Runnable() {
-								public void run() {
-									myWorkingListener.finishedWorking(b.toString());
-								}
-							});
+							myWorkingListener.finishedWorking(messages + " messages, " + exceptions + " validation failures");
 						}
 
 						myNextUpdate = 0;
 					}
-
-				} catch (InterruptedException e) {
-
-					// We can ignore these, they happen if the message is
-					// updated by
-					// the UI during a middle of an update loop
-
-				} catch (Throwable e) {
-
-					ourLog.info("Exception caught during update loop", e);
-					try {
-						Thread.sleep(1000);
-					} catch (InterruptedException e2) {
-						// ignore
-					}
-
+				} catch (Exception e) {
+					ourLog.error("Unexpected error in updater thread", e);
 				}
 
-			} // while
-
-			ourLog.info("Message Tree updater shutting down");
+			}
 
 		}
 
@@ -2425,13 +2513,8 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 			interrupt();
 
 			if (myWorkingListener != null) {
-				EventQueue.invokeLater(new Runnable() {
-					public void run() {
-						myWorkingListener.startedWorking();
-					}
-				});
+				myWorkingListener.startedWorking();
 			}
-
 		}
 
 		public void scheduleUpdateNow() {
@@ -2439,34 +2522,13 @@ public class Hl7V2MessageTree extends Outline implements IDestroyable {
 			interrupt();
 
 			if (myWorkingListener != null) {
-				EventQueue.invokeLater(new Runnable() {
-					public void run() {
-						myWorkingListener.startedWorking();
-					}
-				});
+				myWorkingListener.startedWorking();
 			}
-
 		}
 
 		public void stopThread() {
 			myNextUpdate = -1;
 			interrupt();
-		}
-
-	}
-
-	private class ValidationTreeCellRenderer extends DefaultTableCellRenderer {
-
-		@Override
-		public Component getTableCellRendererComponent(JTable theTable, Object theValue, boolean theIsSelected, boolean theHasFocus, int theRow, int theColumn) {
-			Component tableCellRendererComponent = super.getTableCellRendererComponent(theTable, theValue, theIsSelected, theHasFocus, theRow, theColumn);
-
-			NodeValidationFailure vf = (NodeValidationFailure) theValue;
-			setIcon(vf.getIcon());
-			setToolTipText(vf.getMessage());
-			setText("");
-
-			return tableCellRendererComponent;
 		}
 
 	}

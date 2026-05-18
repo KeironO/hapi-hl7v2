@@ -317,150 +317,7 @@ public class TestPanelWindow implements IDestroyable {
 
 		JMenuBar menuBar = new JMenuBar();
 		myframe.setJMenuBar(menuBar);
-
-		JMenu mnFile = new JMenu("File");
-		mnFile.setMnemonic('f');
-		menuBar.add(mnFile);
-
-		JMenuItem mntmExit = new JMenuItem("Exit");
-		mntmExit.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				myController.close();
-			}
-		});
-
-		JMenuItem mntmNewMessage = new JMenuItem("New Message...");
-		mntmNewMessage.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				myController.addMessage();
-			}
-		});
-		mntmNewMessage.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/message_hl7.png")));
-		mnFile.add(mntmNewMessage);
-
-		mySaveMenuItem = new JMenuItem("Save");
-		mySaveMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
-		mySaveMenuItem.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				doSaveMessages();
-			}
-		});
-		mnFile.add(mySaveMenuItem);
-
-		mySaveAsMenuItem = new JMenuItem("Save As...");
-		mySaveAsMenuItem.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				doSaveMessagesAs();
-			}
-		});
-		mnFile.add(mySaveAsMenuItem);
-		
-		mymenuItem_3 = new JMenuItem("Open");
-		mymenuItem_3.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
-		mymenuItem_3.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				myController.openMessages();
-			}
-		});
-		
-		myRevertToSavedMenuItem = new JMenuItem("Revert to Saved");
-		myRevertToSavedMenuItem.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				myController.revertMessage((Hl7V2MessageCollection) myController.getLeftSelectedItem());
-			}
-		});
-		mnFile.add(myRevertToSavedMenuItem);
-		mnFile.add(mymenuItem_3);
-		
-		myRecentFilesMenu = new JMenu("Open Recent");
-		mnFile.add(myRecentFilesMenu);
-
-		JSeparator separator = new JSeparator();
-		mnFile.add(separator);
-		mnFile.add(mntmExit);
-
-		JMenu mnNewMenu = new JMenu("View");
-		mnNewMenu.setMnemonic('v');
-		menuBar.add(mnNewMenu);
-
-		myShowLogConsoleMenuItem = new JMenuItem("Show Log Console");
-		myShowLogConsoleMenuItem.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				Prefs.getInstance().setShowLogConsole(!Prefs.getInstance().getShowLogConsole());
-				updateLogScrollPaneVisibility();
-				myframe.validate();
-			}
-		});
-		mnNewMenu.add(myShowLogConsoleMenuItem);
-		
-		mymenu_1 = new JMenu("Test");
-		menuBar.add(mymenu_1);
-		
-		mymenuItem_1 = new JMenuItem("Populate TestPanel with Sample Message and Connections...");
-		mymenuItem_1.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				myController.populateWithSampleMessageAndConnections();
-			}
-		});
-		mymenu_1.add(mymenuItem_1);
-		
-		mymenu_3 = new JMenu("Tools");
-		menuBar.add(mymenu_3);
-		
-		mnHl7V2FileDiff = new JMenuItem("HL7 v2 File Diff...");
-		mnHl7V2FileDiff.addActionListener(new ActionListener() {
-
-			public void actionPerformed(ActionEvent e) {
-				if (myHl7V2FileDiff == null) {
-					myHl7V2FileDiff = new Hl7V2FileDiffController(myController);
-				}
-				myHl7V2FileDiff.show();
-			}
-		});
-		mymenu_3.add(mnHl7V2FileDiff);
-		
-		mymenuItem_5 = new JMenuItem("HL7 v2 File Sort...");
-		mymenuItem_5.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				if (myHl7V2FileSort == null) {
-					myHl7V2FileSort = new Hl7V2FileSortController(myController);
-				}
-				myHl7V2FileSort.show();
-			}
-		});
-		mymenu_3.add(mymenuItem_5);
-		
-		mymenu_2 = new JMenu("Conformance");
-		menuBar.add(mymenu_2);
-		
-		mymenuItem_2 = new JMenuItem("Profiles and Tables...");
-		mymenuItem_2.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				myController.showProfilesAndTablesEditor();
-			}
-		});
-		mymenu_2.add(mymenuItem_2);
-		
-		mymenu = new JMenu("Help");
-		mymenu.setMnemonic('H');
-		menuBar.add(mymenu);
-		
-		mymenuItem = new JMenuItem("About HAPI TestPanel...");
-		mymenuItem.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				showAboutDialog();
-			}
-		});
-		mymenuItem.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/hapi_16.png")));
-		mymenu.add(mymenuItem);
-		
-		mymenuItem_4 = new JMenuItem("Licenses...");
-		mymenuItem_4.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				new LicensesDialog().setVisible(true);
-			}
-		});
-		mymenu.add(mymenuItem_4);
+		initializeMenuBar(menuBar);
 		myframe.getContentPane().setLayout(new BorderLayout(0, 0));
 
 		JSplitPane outerSplitPane = new JSplitPane();
@@ -826,6 +683,119 @@ public class TestPanelWindow implements IDestroyable {
 
 	}
 
+	private void initializeMenuBar(JMenuBar menuBar) {
+		createFileMenu(menuBar);
+		createViewMenu(menuBar);
+		createToolsMenu(menuBar);
+		createConformanceMenu(menuBar);
+		createHelpMenu(menuBar);
+	}
+
+	private void createFileMenu(JMenuBar menuBar) {
+		JMenu fileMenu = new JMenu("File");
+		fileMenu.setMnemonic('f');
+		menuBar.add(fileMenu);
+
+		JMenuItem newMessageMenuItem = new JMenuItem("New Message...");
+		newMessageMenuItem.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/message_hl7.png")));
+		newMessageMenuItem.addActionListener(e -> myController.addMessage());
+		fileMenu.add(newMessageMenuItem);
+
+		mySaveMenuItem = new JMenuItem("Save");
+		mySaveMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+		mySaveMenuItem.addActionListener(e -> doSaveMessages());
+		fileMenu.add(mySaveMenuItem);
+
+		mySaveAsMenuItem = new JMenuItem("Save As...");
+		mySaveAsMenuItem.addActionListener(e -> doSaveMessagesAs());
+		fileMenu.add(mySaveAsMenuItem);
+
+		openMenuItem = new JMenuItem("Open");
+		openMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+		openMenuItem.addActionListener(e -> myController.openMessages());
+		fileMenu.add(openMenuItem);
+
+		myRevertToSavedMenuItem = new JMenuItem("Revert to Saved");
+		myRevertToSavedMenuItem.addActionListener(e -> myController.revertMessage((Hl7V2MessageCollection) myController.getLeftSelectedItem()));
+		fileMenu.add(myRevertToSavedMenuItem);
+
+		myRecentFilesMenu = new JMenu("Open Recent");
+		fileMenu.add(myRecentFilesMenu);
+
+		fileMenu.addSeparator();
+
+		JMenuItem exitMenuItem = new JMenuItem("Exit");
+		exitMenuItem.addActionListener(e -> myController.close());
+		fileMenu.add(exitMenuItem);
+	}
+
+	private void createViewMenu(JMenuBar menuBar) {
+		JMenu mnView = new JMenu("View");
+		mnView.setMnemonic('v');
+		menuBar.add(mnView);
+
+		myShowLogConsoleMenuItem = new JMenuItem("Show Log Console");
+		myShowLogConsoleMenuItem.addActionListener(e -> {
+			Prefs.getInstance().setShowLogConsole(!Prefs.getInstance().getShowLogConsole());
+			updateLogScrollPaneVisibility();
+			myframe.validate();
+		});
+		mnView.add(myShowLogConsoleMenuItem);
+	}
+
+	private void createToolsMenu(JMenuBar menuBar) {
+		toolsMenu = new JMenu("Tools");
+		menuBar.add(toolsMenu);
+
+		fileDiffMenuItem = new JMenuItem("HL7 v2 File Diff...");
+		fileDiffMenuItem.addActionListener(e -> {
+			if (myHl7V2FileDiff == null) {
+				myHl7V2FileDiff = new Hl7V2FileDiffController(myController);
+			}
+			myHl7V2FileDiff.show();
+		});
+		toolsMenu.add(fileDiffMenuItem);
+
+		fileSortMenuItem = new JMenuItem("HL7 v2 File Sort...");
+		fileSortMenuItem.addActionListener(e -> {
+			if (myHl7V2FileSort == null) {
+				myHl7V2FileSort = new Hl7V2FileSortController(myController);
+			}
+			myHl7V2FileSort.show();
+		});
+		toolsMenu.add(fileSortMenuItem);
+
+		toolsMenu.addSeparator();
+
+		populateSampleMenuItem = new JMenuItem("Populate TestPanel with Sample Message and Connections...");
+		populateSampleMenuItem.addActionListener(e -> myController.populateWithSampleMessageAndConnections());
+		toolsMenu.add(populateSampleMenuItem);
+	}
+
+	private void createConformanceMenu(JMenuBar menuBar) {
+		conformanceMenu = new JMenu("Conformance");
+		menuBar.add(conformanceMenu);
+
+		profilesAndTablesMenuItem = new JMenuItem("Profiles and Tables...");
+		profilesAndTablesMenuItem.addActionListener(e -> myController.showProfilesAndTablesEditor());
+		conformanceMenu.add(profilesAndTablesMenuItem);
+	}
+
+	private void createHelpMenu(JMenuBar menuBar) {
+		helpMenu = new JMenu("Help");
+		helpMenu.setMnemonic('H');
+		menuBar.add(helpMenu);
+
+		aboutMenuItem = new JMenuItem("About HAPI TestPanel...");
+		aboutMenuItem.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/hapi_16.png")));
+		aboutMenuItem.addActionListener(e -> showAboutDialog());
+		helpMenu.add(aboutMenuItem);
+
+		licensesMenuItem = new JMenuItem("Licenses...");
+		licensesMenuItem.addActionListener(e -> new LicensesDialog().setVisible(true));
+		helpMenu.add(licensesMenuItem);
+	}
+
 	private void initializeLocal() {
 		myMessagesListModel = new MyMessagesListModel();
 		myMessagesList.setModel(myMessagesListModel);
@@ -1038,19 +1008,18 @@ public class TestPanelWindow implements IDestroyable {
 	private JButton myStartAllInboundButton;
 	private JButton myStartOneInboundButton;
 	private JButton myStopAllInboundButton;
-	private JMenu mymenu;
-	private JMenuItem mymenuItem;
-	private JMenu mymenu_1;
-	private JMenuItem mymenuItem_1;
-	private JMenu mymenu_2;
-	private JMenuItem mymenuItem_2;
+	private JMenu helpMenu;
+	private JMenuItem aboutMenuItem;
+	private JMenuItem populateSampleMenuItem;
+	private JMenu conformanceMenu;
+	private JMenuItem profilesAndTablesMenuItem;
 	private JMenu myRecentFilesMenu;
-	private JMenuItem mymenuItem_3;
-	private JMenuItem mymenuItem_4;
-	private JMenu mymenu_3;
-	private JMenuItem mnHl7V2FileDiff;
+	private JMenuItem openMenuItem;
+	private JMenuItem licensesMenuItem;
+	private JMenu toolsMenu;
+	private JMenuItem fileDiffMenuItem;
 	private JMenuItem myRevertToSavedMenuItem;
-	private JMenuItem mymenuItem_5;
+	private JMenuItem fileSortMenuItem;
 
 	private final class MyMessageDescriptionListener implements PropertyChangeListener {
 		public void propertyChange(PropertyChangeEvent theEvt) {
