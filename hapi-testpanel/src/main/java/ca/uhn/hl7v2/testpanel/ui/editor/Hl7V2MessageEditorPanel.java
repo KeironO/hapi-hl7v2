@@ -97,6 +97,7 @@ import ca.uhn.hl7v2.testpanel.ui.Er7SyntaxKit;
 import ca.uhn.hl7v2.testpanel.ui.HoverButtonMouseAdapter;
 import ca.uhn.hl7v2.testpanel.ui.IDestroyable;
 import ca.uhn.hl7v2.testpanel.ui.ShowEnum;
+import ca.uhn.hl7v2.testpanel.ui.TestPanelWindow;
 import ca.uhn.hl7v2.testpanel.ui.v2tree.Hl7V2MessageTree;
 import ca.uhn.hl7v2.testpanel.ui.v2tree.Hl7V2MessageTree.IWorkingListener;
 import ca.uhn.hl7v2.testpanel.util.IOkCancelCallback;
@@ -154,7 +155,6 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 	private JToolBar mytoolBar;
 	private Hl7V2MessageTree myTreePanel;
 	private JPanel treeContainerPanel;
-	private JTabbedPane myTopTabBar;
 	// private JPanel mySendingPanel;
 	private ActivityTable mySendingActivityTable;
 	private PropertyChangeListener myWindowTitleListener;
@@ -178,6 +178,8 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 	private Component myhorizontalStrut_2;
 	private javax.swing.JSpinner mySendTimesSpinner;
 	private JLabel mySendTimesLabel;
+	private TestPanelWindow myTestPanelWindow;
+	private Hl7V2MessageTree myTreeForValidation;
 
 	/**
 	 * Create the panel.
@@ -245,22 +247,9 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 			}
 		});
 
-		JToggleButton wrapLinesToggle = new JToggleButton("Wrap");
-		wrapLinesToggle.setToolTipText("Enable line wrapping in the editor");
-		wrapLinesToggle.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				if (wrapLinesToggle.isSelected()) {
-					myMessageScrollPane.setHorizontalScrollBarPolicy(javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-				} else {
-					myMessageScrollPane.setHorizontalScrollBarPolicy(javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-				}
-			}
-		});
 		myFollowToggle.setIcon(new ImageIcon(Hl7V2MessageEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/updown.png")));
 		myFollowToggle.setSelected(theController.isMessageEditorInFollowMode());
 		toolBar.add(myFollowToggle);
-
-		toolBar.add(wrapLinesToggle);
 
 		myhorizontalStrut = Box.createHorizontalStrut(20);
 		toolBar.add(myhorizontalStrut);
@@ -278,6 +267,19 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		encGrp.add(myRdbtnEr7);
 		encGrp.add(myRdbtnXml);
 
+		Component horizontalGlue = Box.createHorizontalGlue();
+		toolBar.add(horizontalGlue);
+
+		mySpinner = new JButton("");
+		mySpinner.setForeground(Color.DARK_GRAY);
+		mySpinner.setHorizontalAlignment(SwingConstants.RIGHT);
+		mySpinner.setMaximumSize(new Dimension(200, 15));
+		mySpinner.setPreferredSize(new Dimension(200, 15));
+		mySpinner.setMinimumSize(new Dimension(200, 15));
+		mySpinner.setBorderPainted(false);
+		mySpinner.setSize(new Dimension(16, 16));
+		toolBar.add(mySpinner);
+
 		treeContainerPanel = new JPanel();
 		mysplitPane.setLeftComponent(treeContainerPanel);
 		treeContainerPanel.setLayout(new BorderLayout(0, 0));
@@ -286,6 +288,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		mySpinnerIconOff = new ImageIcon();
 
 		myTreePanel = new Hl7V2MessageTree(theController);
+		myTreeForValidation = myTreePanel;
 		myTreePanel.setWorkingListener(new IWorkingListener() {
 
 			public void startedWorking() {
@@ -300,18 +303,17 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 				mySpinner.setIcon(mySpinnerIconOff);
 				mySpinnerIconOn.setImageObserver(null);
+
+				if (myTestPanelWindow != null) {
+					myTestPanelWindow.updateValidationErrors(theStatus, myTreeForValidation);
+				}
 			}
 		});
 
-		myTopTabBar = new JTabbedPane();
-		treeContainerPanel.add(myTopTabBar);
-		myTopTabBar.setBorder(null);
-
 		JPanel treeContainer = new JPanel();
 		treeContainer.setLayout(new BorderLayout(0, 0));
+		treeContainerPanel.add(treeContainer);
 		treeContainer.add(myTreePanel);
-
-		myTopTabBar.add("Message Tree", treeContainer);
 
 		mytoolBar_1 = new JToolBar();
 		mytoolBar_1.setFloatable(false);
@@ -352,16 +354,6 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 		myhorizontalGlue = Box.createHorizontalGlue();
 		mytoolBar_1.add(myhorizontalGlue);
-
-		mySpinner = new JButton("");
-		mySpinner.setForeground(Color.DARK_GRAY);
-		mySpinner.setHorizontalAlignment(SwingConstants.RIGHT);
-		mySpinner.setMaximumSize(new Dimension(200, 15));
-		mySpinner.setPreferredSize(new Dimension(200, 15));
-		mySpinner.setMinimumSize(new Dimension(200, 15));
-		mySpinner.setBorderPainted(false);
-		mySpinner.setSize(new Dimension(16, 16));
-		mytoolBar_1.add(mySpinner);
 		myProfileComboboxModel = new ProfileComboModel();
 
 		myTablesComboModel = new TablesComboModel(myController);
@@ -556,6 +548,8 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 					myMessage.updateSourceMessage(newSource, changeStart, changeEnd);
 
 					ourLog.info("Handled document update in {} ms", System.currentTimeMillis() - start);
+				} catch (Exception e) {
+					ourLog.warn("Error parsing message: {}", e.getMessage());
 				} finally {
 					myDontRespondToSourceMessageChanges = false;
 				}
@@ -708,7 +702,8 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		// Prepopulate the "send to interface" combo to the last value it had
 		if (StringUtils.isNotBlank(myMessage.getLastSendToInterfaceId())) {
 			for (int i = 0; i < myOutboundInterfaceComboModelShadow.size(); i++) {
-				if (myOutboundInterfaceComboModelShadow.get(i).getId().equals(myMessage.getLastSendToInterfaceId())) {
+				OutboundConnection conn = myOutboundInterfaceComboModelShadow.get(i);
+				if (conn != null && conn.getId().equals(myMessage.getLastSendToInterfaceId())) {
 					myOutboundInterfaceCombo.setSelectedIndex(i);
 					break;
 				}
@@ -1116,7 +1111,6 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 	private void activateSendingActivityTabForConnection(OutboundConnection theConnection) {
 		mySendingActivityTable.setConnection(theConnection, false);
-		myTopTabBar.setSelectedComponent(mySendingActivityTable);
 	}
 
 	public Frame getWindow() {
@@ -1125,6 +1119,10 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 	public ActivityTable getSendingActivityTable() {
 		return mySendingActivityTable;
+	}
+
+	public void setTestPanelWindow(TestPanelWindow theWindow) {
+		myTestPanelWindow = theWindow;
 	}
 
 }

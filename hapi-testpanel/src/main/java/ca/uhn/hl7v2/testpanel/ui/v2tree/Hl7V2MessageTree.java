@@ -544,6 +544,10 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		myUpdaterThread.stopThread();
 	}
 
+	public TreeNodeBase getRootNode() {
+		return myTop;
+	}
+
 	private void doSynchronizeTreeWithHighlitedPath() {
 		String highlitedPath = myMessages.getHighlitedPath();
 		if (highlitedPath == null) {
@@ -1405,6 +1409,24 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 
 			retVal += myValidationExceptions.size();
 			return retVal;
+		}
+
+		public void collectValidationExceptions(java.util.List<HL7Exception> theList) {
+			theList.addAll(myValidationExceptions);
+			for (int i = 0; i < getChildCount(); i++) {
+				TreeNodeBase next = (TreeNodeBase) getChildAt(i);
+				next.collectValidationExceptions(theList);
+			}
+		}
+
+		public void collectValidationExceptionsWithPath(java.util.List<java.util.AbstractMap.SimpleEntry<String, HL7Exception>> theList) {
+			for (HL7Exception ex : myValidationExceptions) {
+				theList.add(new java.util.AbstractMap.SimpleEntry<>(getTerserPath(), ex));
+			}
+			for (int i = 0; i < getChildCount(); i++) {
+				TreeNodeBase next = (TreeNodeBase) getChildAt(i);
+				next.collectValidationExceptionsWithPath(theList);
+			}
 		}
 
 		/**

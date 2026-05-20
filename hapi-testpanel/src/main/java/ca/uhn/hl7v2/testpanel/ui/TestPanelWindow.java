@@ -78,6 +78,7 @@ import org.apache.commons.lang.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.testpanel.controller.Controller;
 import ca.uhn.hl7v2.testpanel.controller.Hl7V2FileDiffController;
 import ca.uhn.hl7v2.testpanel.controller.Hl7V2FileSortController;
@@ -92,6 +93,7 @@ import ca.uhn.hl7v2.testpanel.model.conn.OutboundConnectionList;
 import ca.uhn.hl7v2.testpanel.model.msg.Hl7V2MessageCollection;
 import ca.uhn.hl7v2.testpanel.ui.ActivityTable;
 import ca.uhn.hl7v2.testpanel.ui.editor.Hl7V2MessageEditorPanel;
+import ca.uhn.hl7v2.testpanel.ui.v2tree.Hl7V2MessageTree;
 import ca.uhn.hl7v2.testpanel.util.ScreenBoundsUtil;
 import ca.uhn.hl7v2.testpanel.util.SwingLogAppender;
 
@@ -326,6 +328,15 @@ public class TestPanelWindow implements IDestroyable {
 			}
 		});
 
+		myframe.getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
+			.put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, java.awt.event.InputEvent.CTRL_DOWN_MASK), "newMessage");
+		myframe.getRootPane().getActionMap().put("newMessage", new javax.swing.AbstractAction() {
+			@Override
+			public void actionPerformed(java.awt.event.ActionEvent e) {
+				myController.addMessage();
+			}
+		});
+
 		JMenuBar menuBar = new JMenuBar();
 		myframe.setJMenuBar(menuBar);
 		initializeMenuBar(menuBar);
@@ -346,15 +357,26 @@ public class TestPanelWindow implements IDestroyable {
 					Object selected = messages.get(idx);
 					myController.setLeftSelectedItem(selected);
 					myOutboundConnectionsList.clearSelection();
-					myOutboundConnectionsList.repaint();
 					myInboundConnectionsList.clearSelection();
-					myInboundConnectionsList.repaint();
 				}
 			}
 			updateLeftToolbarButtons();
 		});
 
-		myConnectionsTabPane = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
+		myMessagesTabPane.addMouseListener(new java.awt.event.MouseAdapter() {
+			@Override
+			public void mousePressed(java.awt.event.MouseEvent e) {
+				int idx = myMessagesTabPane.getSelectedIndex();
+				if (idx >= 0) {
+					List<Hl7V2MessageCollection> messages = myController.getMessagesList().getMessages();
+					if (idx < messages.size()) {
+						myController.setLeftSelectedItem(messages.get(idx));
+					}
+				}
+			}
+		});
+
+		myConnectionsTabPane = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.WRAP_TAB_LAYOUT);
 		myConnectionsTabPane.setPreferredSize(new Dimension(200, 150));
 
 		JPanel sendingConnectionsPanel = new JPanel();
@@ -362,6 +384,9 @@ public class TestPanelWindow implements IDestroyable {
 
 		JPanel receivingConnectionsPanel = new JPanel();
 		myConnectionsTabPane.addTab("Receiving Connections", receivingConnectionsPanel);
+
+		JPanel sendingActivityPanel = new JPanel();
+		myConnectionsTabPane.addTab("Sending", sendingActivityPanel);
 
 		JPanel connectionsPanel = sendingConnectionsPanel;
 		GridBagLayout gbl_connectionsPanel = new GridBagLayout();
@@ -381,7 +406,7 @@ public class TestPanelWindow implements IDestroyable {
 		gbc_toolBar.gridy = 0;
 		connectionsPanel.add(toolBar, gbc_toolBar);
 
-		myAddConnectionButton = new JButton("");
+		myAddConnectionButton = new JButton("New");
 		myAddConnectionButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				myController.addOutboundConnection();
@@ -389,13 +414,10 @@ public class TestPanelWindow implements IDestroyable {
 		});
 		myAddConnectionButton.setBorderPainted(false);
 		myAddConnectionButton.addMouseListener(new HoverButtonMouseAdapter(myAddConnectionButton));
-		myAddConnectionButton.setBorder(null);
-		myAddConnectionButton.setToolTipText("New Connection");
 		myAddConnectionButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/add.png")));
 		toolBar.add(myAddConnectionButton);
 
-		myDeleteOutboundConnectionButton = new JButton("");
-		myDeleteOutboundConnectionButton.setToolTipText("Delete Selected Connection");
+		myDeleteOutboundConnectionButton = new JButton("Delete");
 		myDeleteOutboundConnectionButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if (myController.getLeftSelectedItem() instanceof OutboundConnection) {
@@ -408,7 +430,7 @@ public class TestPanelWindow implements IDestroyable {
 		myDeleteOutboundConnectionButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/delete.png")));
 		toolBar.add(myDeleteOutboundConnectionButton);
 
-		myStartOneOutboundButton = new JButton("");
+		myStartOneOutboundButton = new JButton("Start");
 		myStartOneOutboundButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if (myController.getLeftSelectedItem() instanceof OutboundConnection) {
@@ -417,14 +439,12 @@ public class TestPanelWindow implements IDestroyable {
 			}
 		});
 		myStartOneOutboundButton.setBorderPainted(false);
-		myStartOneOutboundButton.setToolTipText("Start selected connection");
 		myStartOneOutboundButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/start_one.png")));
 		myStartOneOutboundButton.addMouseListener(new HoverButtonMouseAdapter(myStartOneOutboundButton));
 		toolBar.add(myStartOneOutboundButton);
-		
-		myStartAllOutboundButton = new JButton("");
+
+		myStartAllOutboundButton = new JButton("Start All");
 		myStartAllOutboundButton.setBorderPainted(false);
-		myStartAllOutboundButton.setToolTipText("Start all sending connections");
 		myStartAllOutboundButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/start_all.png")));
 		myStartAllOutboundButton.addMouseListener(new HoverButtonMouseAdapter(myStartAllOutboundButton));
 		myStartAllOutboundButton.addActionListener(new ActionListener() {
@@ -433,15 +453,14 @@ public class TestPanelWindow implements IDestroyable {
 			}
 		});
 		toolBar.add(myStartAllOutboundButton);
-		
-		myStopAllOutboundButton = new JButton("");
+
+		myStopAllOutboundButton = new JButton("Stop All");
 		myStopAllOutboundButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				myController.stopAllOutboundConnections();
 			}
 		});
 		myStopAllOutboundButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/stop_all.png")));
-		myStopAllOutboundButton.setToolTipText("Stop all sending connections");
 		myStopAllOutboundButton.setBorderPainted(false);
 		myStopAllOutboundButton.addMouseListener(new HoverButtonMouseAdapter(myStopAllOutboundButton));
 		toolBar.add(myStopAllOutboundButton);
@@ -488,20 +507,18 @@ public class TestPanelWindow implements IDestroyable {
 		gbc_toolBar_1.gridy = 0;
 		receivingConnectionsPanel.add(toolBar_1, gbc_toolBar_1);
 
-		myAddInboundConnectionButton = new JButton("");
+		myAddInboundConnectionButton = new JButton("New");
 		myAddInboundConnectionButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				myController.addInboundConnection();
 			}
 		});
 		myAddInboundConnectionButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/add.png")));
-		myAddInboundConnectionButton.setToolTipText("New Connection");
 		myAddInboundConnectionButton.setBorderPainted(false);
 		myAddInboundConnectionButton.addMouseListener(new HoverButtonMouseAdapter(myAddInboundConnectionButton));
 		toolBar_1.add(myAddInboundConnectionButton);
 
-		myDeleteInboundConnectionButton = new JButton("");
-		myDeleteInboundConnectionButton.setToolTipText("Delete Selected Connection");
+		myDeleteInboundConnectionButton = new JButton("Delete");
 		myDeleteInboundConnectionButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if (myController.getLeftSelectedItem() instanceof InboundConnection) {
@@ -513,8 +530,8 @@ public class TestPanelWindow implements IDestroyable {
 		myDeleteInboundConnectionButton.addMouseListener(new HoverButtonMouseAdapter(myDeleteInboundConnectionButton));
 		myDeleteInboundConnectionButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/delete.png")));
 		toolBar_1.add(myDeleteInboundConnectionButton);
-		
-		myStartOneInboundButton = new JButton("");
+
+		myStartOneInboundButton = new JButton("Start");
 		myStartOneInboundButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				if (myController.getLeftSelectedItem() instanceof InboundConnection) {
@@ -523,14 +540,13 @@ public class TestPanelWindow implements IDestroyable {
 			}
 		});
 		myStartOneInboundButton.setBorderPainted(false);
-		myStartOneInboundButton.setToolTipText("Start selected connection");
 		myStartOneInboundButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/start_one.png")));
 		myStartOneInboundButton.addMouseListener(new HoverButtonMouseAdapter(myStartOneInboundButton));
 		toolBar_1.add(myStartOneInboundButton);
 		
 		myStartAllInboundButton = new JButton("");
 		myStartAllInboundButton.setBorderPainted(false);
-		myStartAllInboundButton.setToolTipText("Start all receiving connections");
+		myStartAllInboundButton.setText("Start All");
 		myStartAllInboundButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/start_all.png")));
 		myStartAllInboundButton.addMouseListener(new HoverButtonMouseAdapter(myStartAllInboundButton));
 		myStartAllInboundButton.addActionListener(new ActionListener() {
@@ -539,15 +555,14 @@ public class TestPanelWindow implements IDestroyable {
 			}
 		});
 		toolBar_1.add(myStartAllInboundButton);
-		
-		myStopAllInboundButton = new JButton("");
+
+		myStopAllInboundButton = new JButton("Stop All");
 		myStopAllInboundButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				myController.stopAllInboundConnections();
 			}
 		});
 		myStopAllInboundButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/stop_all.png")));
-		myStopAllInboundButton.setToolTipText("Stop all receiving connections");
 		myStopAllInboundButton.setBorderPainted(false);
 		myStopAllInboundButton.addMouseListener(new HoverButtonMouseAdapter(myStopAllInboundButton));
 		toolBar_1.add(myStopAllInboundButton);
@@ -596,13 +611,26 @@ public class TestPanelWindow implements IDestroyable {
 		myEditorContentPanel.setLayout(new BorderLayout(0, 0));
 		centerPanel.add(myEditorContentPanel, BorderLayout.CENTER);
 
+		// Add log as a tab in the connections pane
+		myLogScrollPane = new LogTable();
+		myLogTabIndex = 3;
+		myConnectionsTabPane.addTab("Log", myLogScrollPane);
+
+		// Add validation errors tab
+		JPanel validationPanel = new JPanel();
+		validationPanel.setLayout(new BorderLayout());
+		myValidationTable = new javax.swing.JTable();
+		myValidationTable.setModel(new javax.swing.table.DefaultTableModel(
+			new Object[][] {},
+			new String[] { "Field", "Error" }
+		));
+		javax.swing.JScrollPane validationScrollPane = new javax.swing.JScrollPane(myValidationTable);
+		validationPanel.add(validationScrollPane, BorderLayout.CENTER);
+		myValidationTabIndex = 4;
+		myConnectionsTabPane.addTab("Validation Errors (0)", validationPanel);
+
 		// Add connections tabs to the bottom
 		centerPanel.add(myConnectionsTabPane, BorderLayout.SOUTH);
-
-		myLogScrollPane = new LogTable();
-		myLogScrollPane.setPreferredSize(new Dimension(454, 120));
-		myLogScrollPane.setMaximumSize(new Dimension(32767, 120));
-		myframe.getContentPane().add(myLogScrollPane, BorderLayout.SOUTH);
 
 		updateLogScrollPaneVisibility();
 
@@ -611,20 +639,53 @@ public class TestPanelWindow implements IDestroyable {
 
 	private void updateLogScrollPaneVisibility() {
 		if (Prefs.getInstance().getShowLogConsole()) {
-			myShowLogConsoleMenuItem.setSelected(true);
 			myLogScrollPane.setVisible(true);
-			myShowLogConsoleMenuItem.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/menu_selected.png")));
 		} else {
-			myShowLogConsoleMenuItem.setSelected(false);
 			myLogScrollPane.setVisible(false);
-			myShowLogConsoleMenuItem.setIcon(null);
+		}
+	}
+
+	public void updateValidationErrors(String statusMessage, Hl7V2MessageTree theTree) {
+		javax.swing.table.DefaultTableModel model = (javax.swing.table.DefaultTableModel) myValidationTable.getModel();
+		model.setRowCount(0);
+
+		if (statusMessage == null || statusMessage.isEmpty() || theTree == null) {
+			myConnectionsTabPane.setTitleAt(myValidationTabIndex, "Validation Errors (0)");
+			return;
 		}
 
+		// Collect all validation exceptions with their field paths from the tree
+		List<java.util.AbstractMap.SimpleEntry<String, HL7Exception>> exceptionsWithPath = new ArrayList<>();
+		Hl7V2MessageTree.TreeNodeBase root = theTree.getRootNode();
+		if (root != null) {
+			root.collectValidationExceptionsWithPath(exceptionsWithPath);
+		}
+
+		// Populate the table with validation errors
+		for (java.util.AbstractMap.SimpleEntry<String, HL7Exception> entry : exceptionsWithPath) {
+			java.util.Vector<Object> row = new java.util.Vector<>();
+			row.add(entry.getKey());
+			row.add(entry.getValue().getMessage());
+			model.addRow(row);
+		}
+
+		myConnectionsTabPane.setTitleAt(myValidationTabIndex, "Validation Errors (" + exceptionsWithPath.size() + ")");
+	}
+
+	public void displayValidationError(String errorMessage) {
+		java.util.Vector<Object> row = new java.util.Vector<>();
+		row.add("Parse Error");
+		row.add(errorMessage);
+
+		javax.swing.table.DefaultTableModel model = (javax.swing.table.DefaultTableModel) myValidationTable.getModel();
+		model.addRow(row);
+
+		myConnectionsTabPane.setTitleAt(myValidationTabIndex, "Validation Errors (" + model.getRowCount() + ")");
+		myConnectionsTabPane.setSelectedIndex(myValidationTabIndex);
 	}
 
 	private void initializeMenuBar(JMenuBar menuBar) {
 		createFileMenu(menuBar);
-		createViewMenu(menuBar);
 		createToolsMenu(menuBar);
 		createConformanceMenu(menuBar);
 		createHelpMenu(menuBar);
@@ -668,19 +729,6 @@ public class TestPanelWindow implements IDestroyable {
 		fileMenu.add(exitMenuItem);
 	}
 
-	private void createViewMenu(JMenuBar menuBar) {
-		JMenu mnView = new JMenu("View");
-		mnView.setMnemonic('v');
-		menuBar.add(mnView);
-
-		myShowLogConsoleMenuItem = new JMenuItem("Show Log Console");
-		myShowLogConsoleMenuItem.addActionListener(e -> {
-			Prefs.getInstance().setShowLogConsole(!Prefs.getInstance().getShowLogConsole());
-			updateLogScrollPaneVisibility();
-			myframe.validate();
-		});
-		mnView.add(myShowLogConsoleMenuItem);
-	}
 
 	private void createToolsMenu(JMenuBar menuBar) {
 		toolsMenu = new JMenu("Tools");
@@ -996,9 +1044,11 @@ public class TestPanelWindow implements IDestroyable {
 	private JList myOutboundConnectionsList;
 	private JList myInboundConnectionsList;
 	private JScrollPane myLogScrollPane;
+	private int myLogTabIndex;
+	private javax.swing.JTable myValidationTable;
+	private int myValidationTabIndex;
 	private BaseMainPanel myMainPanel;
 	private JButton myDeleteInboundConnectionButton;
-	private JMenuItem myShowLogConsoleMenuItem;
 	private JMenuItem mySaveMenuItem;
 	private JMenuItem mySaveAsMenuItem;
 	private JButton myStartAllInboundButton;
@@ -1160,18 +1210,16 @@ public class TestPanelWindow implements IDestroyable {
 		myEditorContentPanel.add(theOutboundPanel, BorderLayout.CENTER);
 		myEditorContentPanel.validate();
 
-		// Add the Sending activity table from the editor to the connections tabs
+		// Update the Sending activity table from the editor to the connections tabs
 		if (theOutboundPanel instanceof Hl7V2MessageEditorPanel) {
 			Hl7V2MessageEditorPanel editorPanel = (Hl7V2MessageEditorPanel) theOutboundPanel;
+			editorPanel.setTestPanelWindow(this);
 			ActivityTable sendingTable = editorPanel.getSendingActivityTable();
-			// Remove any existing "Sending" tab if present
-			for (int i = myConnectionsTabPane.getTabCount() - 1; i >= 0; i--) {
-				if ("Sending".equals(myConnectionsTabPane.getTitleAt(i))) {
-					myConnectionsTabPane.removeTabAt(i);
-				}
+			// Find and update the "Sending" tab (it's at index 2)
+			int sendingTabIndex = 2;
+			if (sendingTabIndex < myConnectionsTabPane.getTabCount()) {
+				myConnectionsTabPane.setComponentAt(sendingTabIndex, sendingTable);
 			}
-			// Add the Sending tab
-			myConnectionsTabPane.addTab("Sending", sendingTable);
 		}
 
 		myMessagesTabPane.repaint();
