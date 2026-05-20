@@ -37,6 +37,8 @@ import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -47,6 +49,7 @@ import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.swing.Box;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
@@ -61,9 +64,12 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
 import javax.swing.JToolBar;
 import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
@@ -84,6 +90,8 @@ import ca.uhn.hl7v2.testpanel.model.conn.InboundConnectionList;
 import ca.uhn.hl7v2.testpanel.model.conn.OutboundConnection;
 import ca.uhn.hl7v2.testpanel.model.conn.OutboundConnectionList;
 import ca.uhn.hl7v2.testpanel.model.msg.Hl7V2MessageCollection;
+import ca.uhn.hl7v2.testpanel.ui.ActivityTable;
+import ca.uhn.hl7v2.testpanel.ui.editor.Hl7V2MessageEditorPanel;
 import ca.uhn.hl7v2.testpanel.util.ScreenBoundsUtil;
 import ca.uhn.hl7v2.testpanel.util.SwingLogAppender;
 
@@ -95,8 +103,10 @@ public class TestPanelWindow implements IDestroyable {
 	private Hl7V2FileDiffController myHl7V2FileDiff;
 	private Controller myController;
 	private JFrame myframe;
-	private JList myMessagesList;
-	private MyMessagesListModel myMessagesListModel;
+	private JTabbedPane myMessagesTabPane;
+	private JTabbedPane myConnectionsTabPane;
+	private boolean myUpdatingTabs = false;
+	private PropertyChangeListener myTabTitleListener;
 	private final PropertyChangeListener myMessageDescriptionListener;
 	private MyOutboundConnectionsListModel myOutboundConnectionsListModel;
 	private MyInboundConnectionsListModel myInboundConnectionsListModel;
@@ -118,7 +128,8 @@ public class TestPanelWindow implements IDestroyable {
 	public TestPanelWindow(Controller theController) {
 		myController = theController;
 
-		myMessageDescriptionListener = new MyMessageDescriptionListener();
+		// myMessageDescriptionListener is only used for connections lists now
+		myMessageDescriptionListener = null;
 		new SwingLogAppender();
 
 		initialize();
@@ -126,7 +137,9 @@ public class TestPanelWindow implements IDestroyable {
 		initWindowPosition();
 
 		if (myController.getLeftSelectedItem() instanceof Hl7V2MessageCollection) {
-			myMessagesList.setSelectedValue(myController.getLeftSelectedItem(), true);
+			int idx = myController.getMessagesList().getMessages()
+				.indexOf(myController.getLeftSelectedItem());
+			if (idx >= 0) myMessagesTabPane.setSelectedIndex(idx);
 		} else if (myController.getLeftSelectedItem() instanceof InboundConnection) {
 			myInboundConnectionsList.setSelectedValue(myController.getLeftSelectedItem(), true);
 		} else if (myController.getLeftSelectedItem() instanceof OutboundConnection) {
@@ -212,14 +225,12 @@ public class TestPanelWindow implements IDestroyable {
 	}
 
 	public void clearMessagesListSelection() {
-		myMessagesList.clearSelection();
+		// JTabbedPane doesn't support deselection; this is a no-op
 	}
 
 	private void updateLeftToolbarButtons() {
 
 		boolean isMsg = (myController.getLeftSelectedItem() instanceof Hl7V2MessageCollection);
-		myMsgSaveButton.setEnabled(isMsg);
-		myDeleteMessageButton.setEnabled(isMsg);
 		mySaveMenuItem.setEnabled(isMsg);
 		mySaveAsMenuItem.setEnabled(isMsg);
 		myRevertToSavedMenuItem.setEnabled(leftMessageHasSaveFilename());
@@ -320,131 +331,45 @@ public class TestPanelWindow implements IDestroyable {
 		initializeMenuBar(menuBar);
 		myframe.getContentPane().setLayout(new BorderLayout(0, 0));
 
-		JSplitPane outerSplitPane = new JSplitPane();
-		outerSplitPane.setBorder(null);
-		myframe.getContentPane().add(outerSplitPane);
+		JPanel mainPanel = new JPanel();
+		mainPanel.setLayout(new BorderLayout());
+		myframe.getContentPane().add(mainPanel);
 
-		JSplitPane leftSplitPane = new JSplitPane();
-		leftSplitPane.setOrientation(JSplitPane.VERTICAL_SPLIT);
-		outerSplitPane.setLeftComponent(leftSplitPane);
 
-		JPanel messagesPanel = new JPanel();
-		leftSplitPane.setLeftComponent(messagesPanel);
-		GridBagLayout gbl_messagesPanel = new GridBagLayout();
-		gbl_messagesPanel.columnWidths = new int[] { 110, 0 };
-		gbl_messagesPanel.rowHeights = new int[] { 20, 30, 118, 0, 0 };
-		gbl_messagesPanel.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
-		gbl_messagesPanel.rowWeights = new double[] { 0.0, 0.0, 100.0, 1.0, Double.MIN_VALUE };
-		messagesPanel.setLayout(gbl_messagesPanel);
-
-		JLabel lblMessages = new JLabel("Messages");
-		GridBagConstraints gbc_lblMessages = new GridBagConstraints();
-		gbc_lblMessages.insets = new Insets(0, 0, 5, 0);
-		gbc_lblMessages.gridx = 0;
-		gbc_lblMessages.gridy = 0;
-		messagesPanel.add(lblMessages, gbc_lblMessages);
-
-		JToolBar messagesToolBar = new JToolBar();
-		messagesToolBar.setFloatable(false);
-		messagesToolBar.setRollover(true);
-		messagesToolBar.setAlignmentX(Component.LEFT_ALIGNMENT);
-		GridBagConstraints gbc_messagesToolBar = new GridBagConstraints();
-		gbc_messagesToolBar.insets = new Insets(0, 0, 5, 0);
-		gbc_messagesToolBar.weightx = 1.0;
-		gbc_messagesToolBar.anchor = GridBagConstraints.NORTHWEST;
-		gbc_messagesToolBar.gridx = 0;
-		gbc_messagesToolBar.gridy = 1;
-		messagesPanel.add(messagesToolBar, gbc_messagesToolBar);
-
-		JButton msgOpenButton = new JButton("");
-		msgOpenButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				myController.openMessages();
-			}
-		});
-
-		myAddMessageButton = new JButton("");
-		myAddMessageButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				myController.addMessage();
-			}
-		});
-		myAddMessageButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/add.png")));
-		myAddMessageButton.setToolTipText("New Message");
-		myAddMessageButton.setBorderPainted(false);
-		myAddMessageButton.addMouseListener(new HoverButtonMouseAdapter(myAddMessageButton));
-		messagesToolBar.add(myAddMessageButton);
-
-		myDeleteMessageButton = new JButton("");
-		myDeleteMessageButton.setToolTipText("Close Selected Message");
-		myDeleteMessageButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				myController.closeMessage((Hl7V2MessageCollection) myController.getLeftSelectedItem());
-			}
-		});
-		myDeleteMessageButton.setBorderPainted(false);
-		myDeleteMessageButton.addMouseListener(new HoverButtonMouseAdapter(myDeleteMessageButton));
-		myDeleteMessageButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/close.png")));
-		messagesToolBar.add(myDeleteMessageButton);
-		msgOpenButton.setBorderPainted(false);
-		msgOpenButton.setToolTipText("Open Messages from File");
-		msgOpenButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/open.png")));
-		msgOpenButton.addMouseListener(new HoverButtonMouseAdapter(msgOpenButton));
-		messagesToolBar.add(msgOpenButton);
-
-		myMsgSaveButton = new JButton("");
-		myMsgSaveButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				doSaveMessages();
-			}
-		});
-		myMsgSaveButton.setBorderPainted(false);
-		myMsgSaveButton.setToolTipText("Save Selected Messages to File");
-		myMsgSaveButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/save.png")));
-		myMsgSaveButton.addMouseListener(new HoverButtonMouseAdapter(myMsgSaveButton));
-		messagesToolBar.add(myMsgSaveButton);
-
-		myMessagesList = new JList();
-		myMessagesList.addListSelectionListener(new ListSelectionListener() {
-			public void valueChanged(ListSelectionEvent e) {
-				if (myMessagesList.getSelectedIndex() >= 0) {
-					ourLog.debug("New messages selection " + myMessagesList.getSelectedIndex());
-					myController.setLeftSelectedItem(myMessagesList.getSelectedValue());
+		myMessagesTabPane = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
+		myMessagesTabPane.addChangeListener(e -> {
+			if (myUpdatingTabs) return;
+			int idx = myMessagesTabPane.getSelectedIndex();
+			if (idx >= 0) {
+				List<Hl7V2MessageCollection> messages = myController.getMessagesList().getMessages();
+				if (idx < messages.size()) {
+					Object selected = messages.get(idx);
+					myController.setLeftSelectedItem(selected);
 					myOutboundConnectionsList.clearSelection();
 					myOutboundConnectionsList.repaint();
 					myInboundConnectionsList.clearSelection();
 					myInboundConnectionsList.repaint();
 				}
-				updateLeftToolbarButtons();
 			}
+			updateLeftToolbarButtons();
 		});
-		GridBagConstraints gbc_MessagesList = new GridBagConstraints();
-		gbc_MessagesList.gridheight = 2;
-		gbc_MessagesList.weightx = 1.0;
-		gbc_MessagesList.weighty = 1.0;
-		gbc_MessagesList.fill = GridBagConstraints.BOTH;
-		gbc_MessagesList.gridx = 0;
-		gbc_MessagesList.gridy = 2;
-		messagesPanel.add(myMessagesList, gbc_MessagesList);
 
-		JPanel connectionsPanel = new JPanel();
-		leftSplitPane.setRightComponent(connectionsPanel);
+		myConnectionsTabPane = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
+		myConnectionsTabPane.setPreferredSize(new Dimension(200, 150));
+
+		JPanel sendingConnectionsPanel = new JPanel();
+		myConnectionsTabPane.addTab("Sending Connections", sendingConnectionsPanel);
+
+		JPanel receivingConnectionsPanel = new JPanel();
+		myConnectionsTabPane.addTab("Receiving Connections", receivingConnectionsPanel);
+
+		JPanel connectionsPanel = sendingConnectionsPanel;
 		GridBagLayout gbl_connectionsPanel = new GridBagLayout();
 		gbl_connectionsPanel.columnWidths = new int[] { 194, 0 };
-		gbl_connectionsPanel.rowHeights = new int[] { 0, 30, 0, 0, 0, 0, 0 };
+		gbl_connectionsPanel.rowHeights = new int[] { 30, 0, 0 };
 		gbl_connectionsPanel.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
-		gbl_connectionsPanel.rowWeights = new double[] { 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, Double.MIN_VALUE };
+		gbl_connectionsPanel.rowWeights = new double[] { 0.0, 0.0, 1.0, Double.MIN_VALUE };
 		connectionsPanel.setLayout(gbl_connectionsPanel);
-
-		JLabel lblConnections = new JLabel("Sending Connections");
-		lblConnections.setHorizontalAlignment(SwingConstants.CENTER);
-		GridBagConstraints gbc_lblConnections = new GridBagConstraints();
-		gbc_lblConnections.insets = new Insets(0, 0, 5, 0);
-		gbc_lblConnections.anchor = GridBagConstraints.NORTH;
-		gbc_lblConnections.fill = GridBagConstraints.HORIZONTAL;
-		gbc_lblConnections.gridx = 0;
-		gbc_lblConnections.gridy = 0;
-		connectionsPanel.add(lblConnections, gbc_lblConnections);
 
 		JToolBar toolBar = new JToolBar();
 		toolBar.setFloatable(false);
@@ -453,7 +378,7 @@ public class TestPanelWindow implements IDestroyable {
 		gbc_toolBar.anchor = GridBagConstraints.NORTH;
 		gbc_toolBar.fill = GridBagConstraints.HORIZONTAL;
 		gbc_toolBar.gridx = 0;
-		gbc_toolBar.gridy = 1;
+		gbc_toolBar.gridy = 0;
 		connectionsPanel.add(toolBar, gbc_toolBar);
 
 		myAddConnectionButton = new JButton("");
@@ -525,7 +450,7 @@ public class TestPanelWindow implements IDestroyable {
 		scrollPane.setBorder(null);
 		GridBagConstraints gbc_scrollPane = new GridBagConstraints();
 		gbc_scrollPane.fill = GridBagConstraints.BOTH;
-		gbc_scrollPane.insets = new Insets(0, 0, 5, 0);
+		gbc_scrollPane.weighty = 1.0;
 		gbc_scrollPane.gridx = 0;
 		gbc_scrollPane.gridy = 2;
 		connectionsPanel.add(scrollPane, gbc_scrollPane);
@@ -537,8 +462,7 @@ public class TestPanelWindow implements IDestroyable {
 				if (myOutboundConnectionsList.getSelectedIndex() >= 0) {
 					ourLog.debug("New outbound connection selection " + myOutboundConnectionsList.getSelectedIndex());
 					myController.setLeftSelectedItem(myOutboundConnectionsList.getSelectedValue());
-					myMessagesList.clearSelection();
-					myMessagesList.repaint();
+					myMessagesTabPane.repaint();
 					myInboundConnectionsList.clearSelection();
 					myInboundConnectionsList.repaint();
 				}
@@ -547,22 +471,22 @@ public class TestPanelWindow implements IDestroyable {
 		});
 		scrollPane.setViewportView(myOutboundConnectionsList);
 
-		JLabel lblReceivingConnections = new JLabel("Receiving Connections");
-		lblReceivingConnections.setHorizontalAlignment(SwingConstants.CENTER);
-		GridBagConstraints gbc_lblReceivingConnections = new GridBagConstraints();
-		gbc_lblReceivingConnections.insets = new Insets(0, 0, 5, 0);
-		gbc_lblReceivingConnections.gridx = 0;
-		gbc_lblReceivingConnections.gridy = 3;
-		connectionsPanel.add(lblReceivingConnections, gbc_lblReceivingConnections);
+		GridBagLayout gbl_receivingConnectionsPanel = new GridBagLayout();
+		gbl_receivingConnectionsPanel.columnWidths = new int[] { 194, 0 };
+		gbl_receivingConnectionsPanel.rowHeights = new int[] { 30, 0, 0 };
+		gbl_receivingConnectionsPanel.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_receivingConnectionsPanel.rowWeights = new double[] { 0.0, 1.0, Double.MIN_VALUE };
+		receivingConnectionsPanel.setLayout(gbl_receivingConnectionsPanel);
 
 		JToolBar toolBar_1 = new JToolBar();
 		toolBar_1.setFloatable(false);
 		GridBagConstraints gbc_toolBar_1 = new GridBagConstraints();
 		gbc_toolBar_1.anchor = GridBagConstraints.WEST;
 		gbc_toolBar_1.insets = new Insets(0, 0, 5, 0);
+		gbc_toolBar_1.fill = GridBagConstraints.HORIZONTAL;
 		gbc_toolBar_1.gridx = 0;
-		gbc_toolBar_1.gridy = 4;
-		connectionsPanel.add(toolBar_1, gbc_toolBar_1);
+		gbc_toolBar_1.gridy = 0;
+		receivingConnectionsPanel.add(toolBar_1, gbc_toolBar_1);
 
 		myAddInboundConnectionButton = new JButton("");
 		myAddInboundConnectionButton.addActionListener(new ActionListener() {
@@ -632,9 +556,10 @@ public class TestPanelWindow implements IDestroyable {
 		scrollPane_1.setBorder(null);
 		GridBagConstraints gbc_scrollPane_1 = new GridBagConstraints();
 		gbc_scrollPane_1.fill = GridBagConstraints.BOTH;
+		gbc_scrollPane_1.weighty = 1.0;
 		gbc_scrollPane_1.gridx = 0;
-		gbc_scrollPane_1.gridy = 5;
-		connectionsPanel.add(scrollPane_1, gbc_scrollPane_1);
+		gbc_scrollPane_1.gridy = 1;
+		receivingConnectionsPanel.add(scrollPane_1, gbc_scrollPane_1);
 
 		myInboundConnectionsList = new JList();
 		myInboundConnectionsList.addListSelectionListener(new ListSelectionListener() {
@@ -642,8 +567,7 @@ public class TestPanelWindow implements IDestroyable {
 				if (myInboundConnectionsList.getSelectedIndex() >= 0) {
 					ourLog.debug("New inbound connection selection " + myInboundConnectionsList.getSelectedIndex());
 					myController.setLeftSelectedItem(myInboundConnectionsList.getSelectedValue());
-					myMessagesList.clearSelection();
-					myMessagesList.repaint();
+					myMessagesTabPane.repaint();
 					myOutboundConnectionsList.clearSelection();
 					myOutboundConnectionsList.repaint();
 					myInboundConnectionsList.repaint();
@@ -652,13 +576,28 @@ public class TestPanelWindow implements IDestroyable {
 			}
 		});
 		scrollPane_1.setViewportView(myInboundConnectionsList);
-		leftSplitPane.setDividerLocation(200);
 
 		myWorkspacePanel = new JPanel();
 		myWorkspacePanel.setBorder(null);
-		outerSplitPane.setRightComponent(myWorkspacePanel);
 		myWorkspacePanel.setLayout(new BorderLayout(0, 0));
-		outerSplitPane.setDividerLocation(200);
+		mainPanel.add(myWorkspacePanel, BorderLayout.CENTER);
+
+		// Create container for tabs and editor
+		JPanel centerPanel = new JPanel();
+		centerPanel.setLayout(new BorderLayout(0, 0));
+		myWorkspacePanel.add(centerPanel, BorderLayout.CENTER);
+
+		// Add the message tabs
+		centerPanel.add(myMessagesTabPane, BorderLayout.NORTH);
+
+		// Create a separate panel for the editor content
+		myEditorContentPanel = new JPanel();
+		myEditorContentPanel.setBorder(null);
+		myEditorContentPanel.setLayout(new BorderLayout(0, 0));
+		centerPanel.add(myEditorContentPanel, BorderLayout.CENTER);
+
+		// Add connections tabs to the bottom
+		centerPanel.add(myConnectionsTabPane, BorderLayout.SOUTH);
 
 		myLogScrollPane = new LogTable();
 		myLogScrollPane.setPreferredSize(new Dimension(454, 120));
@@ -797,10 +736,16 @@ public class TestPanelWindow implements IDestroyable {
 	}
 
 	private void initializeLocal() {
-		myMessagesListModel = new MyMessagesListModel();
-		myMessagesList.setModel(myMessagesListModel);
-		myMessagesList.setCellRenderer(new MyMessagesListCellRencerer());
-		myController.getMessagesList().addPropertyChangeListener(MessagesList.PROP_LIST, myMessagesListModel);
+		myTabTitleListener = evt -> {
+			Hl7V2MessageCollection source = (Hl7V2MessageCollection) evt.getSource();
+			List<Hl7V2MessageCollection> messages = myController.getMessagesList().getMessages();
+			int i = messages.indexOf(source);
+			if (i >= 0) myMessagesTabPane.setTitleAt(i, buildTabTitle(source));
+		};
+		myController.getMessagesList().addPropertyChangeListener(
+			MessagesList.PROP_LIST,
+			evt -> updateMessagesList()
+		);
 		updateMessagesList();
 
 		myOutboundConnectionsListModel = new MyOutboundConnectionsListModel();
@@ -872,12 +817,12 @@ public class TestPanelWindow implements IDestroyable {
 	 * Save the currently selected message
 	 */
 	private void doSaveMessages() {
-		ourLog.info("Selected index: {}", myMessagesList.getSelectedIndex());
+		ourLog.info("Selected index: {}", myMessagesTabPane.getSelectedIndex());
 		myController.saveMessages((Hl7V2MessageCollection) myController.getLeftSelectedItem());
 	}
 
 	private void doSaveMessagesAs() {
-		ourLog.info("Selected index: {}", myMessagesList.getSelectedIndex());
+		ourLog.info("Selected index: {}", myMessagesTabPane.getSelectedIndex());
 		myController.saveMessagesAs((Hl7V2MessageCollection) myController.getLeftSelectedItem());
 	}
 	
@@ -961,32 +906,84 @@ public class TestPanelWindow implements IDestroyable {
 	}
 
 	public void updateMessagesList() {
+		myUpdatingTabs = true;
+		try {
+			List<Hl7V2MessageCollection> messages = myController.getMessagesList().getMessages();
 
-		int index = 0;
-		myMessagesList.clearSelection();
-		for (Hl7V2MessageCollection next : myController.getMessagesList().getMessages()) {
-
-			if (myMessagesListModel.size() <= index) {
-				myMessagesListModel.addElement(next);
-				next.addPropertyChangeListener(Hl7V2MessageCollection.PROP_DESCRIPTION, myMessageDescriptionListener);
-				next.addPropertyChangeListener(Hl7V2MessageCollection.SAVED_PROPERTY, myMessageDescriptionListener);
-			} else if (myMessagesListModel.getElementAt(index) != next) {
-				myMessagesListModel.add(index, next);
-				next.addPropertyChangeListener(Hl7V2MessageCollection.PROP_DESCRIPTION, myMessageDescriptionListener);
-				next.addPropertyChangeListener(Hl7V2MessageCollection.SAVED_PROPERTY, myMessageDescriptionListener);
+			// Remove listeners from tabs being removed
+			for (int i = myMessagesTabPane.getTabCount() - 1; i >= messages.size(); i--) {
+				Hl7V2MessageCollection old = (Hl7V2MessageCollection) myMessagesTabPane.getClientProperty("msg_" + i);
+				if (old != null) {
+					old.removePropertyChangeListener(Hl7V2MessageCollection.PROP_DESCRIPTION, myTabTitleListener);
+					old.removePropertyChangeListener(Hl7V2MessageCollection.SAVED_PROPERTY, myTabTitleListener);
+				}
+				myMessagesTabPane.removeTabAt(i);
 			}
 
-			if (next == myController.getLeftSelectedItem()) {
-				myMessagesList.setSelectedIndex(index);
-			}
+			for (int i = 0; i < messages.size(); i++) {
+				Hl7V2MessageCollection msg = messages.get(i);
+				String title = buildTabTitle(msg);
+				if (i < myMessagesTabPane.getTabCount()) {
+					myMessagesTabPane.setTitleAt(i, title);
+					myMessagesTabPane.putClientProperty("msg_" + i, msg);
+				} else {
+					myMessagesTabPane.addTab(title, new JPanel());
+					myMessagesTabPane.putClientProperty("msg_" + i, msg);
+					msg.addPropertyChangeListener(Hl7V2MessageCollection.PROP_DESCRIPTION, myTabTitleListener);
+					msg.addPropertyChangeListener(Hl7V2MessageCollection.SAVED_PROPERTY, myTabTitleListener);
+				}
 
-			index++;
+				if (msg == myController.getLeftSelectedItem()) {
+					myMessagesTabPane.setSelectedIndex(i);
+				}
+			}
+			setupTabCloseButtons();
+		} finally {
+			myUpdatingTabs = false;
 		}
+	}
 
-		while (myMessagesListModel.size() > index) {
-			Hl7V2MessageCollection obj = (Hl7V2MessageCollection) myMessagesListModel.remove(index);
-			obj.removePropertyChangeListener(Hl7V2MessageCollection.PROP_DESCRIPTION, myMessageDescriptionListener);
-			obj.removePropertyChangeListener(Hl7V2MessageCollection.SAVED_PROPERTY, myMessageDescriptionListener);
+	private String buildTabTitle(Hl7V2MessageCollection collection) {
+		if (collection.isSaved()) {
+			return collection.getMessageDescription();
+		}
+		return "<html><font color='red'>" + collection.getMessageDescription() + "*</font></html>";
+	}
+
+	private void setupTabCloseButtons() {
+		for (int i = 0; i < myMessagesTabPane.getTabCount(); i++) {
+			JPanel tabComponent = new JPanel(new BorderLayout(5, 0));
+			tabComponent.setOpaque(false);
+
+			String title = myMessagesTabPane.getTitleAt(i);
+			// Strip HTML tags for display in label
+			String plainText = title.replaceAll("<[^>]*>", "");
+			JLabel label = new JLabel(plainText);
+			tabComponent.add(label, BorderLayout.CENTER);
+
+			JButton closeButton = new JButton("×");
+			closeButton.setMargin(new Insets(0, 3, 0, 3));
+			closeButton.setFont(closeButton.getFont().deriveFont(12f));
+			closeButton.setFocusPainted(false);
+			closeButton.setContentAreaFilled(false);
+			closeButton.setBorderPainted(false);
+
+			final int tabIndex = i;
+			closeButton.addActionListener(e -> {
+				Hl7V2MessageCollection msg = (Hl7V2MessageCollection) myMessagesTabPane.getClientProperty("msg_" + tabIndex);
+				if (msg != null) {
+					try {
+						myController.closeMessage(msg);
+					} catch (Exception ex) {
+						ourLog.warn("Error closing message", ex);
+						// Try to close anyway by removing from the list
+						myController.getMessagesList().removeMessage(msg);
+					}
+				}
+			});
+
+			tabComponent.add(closeButton, BorderLayout.EAST);
+			myMessagesTabPane.setTabComponentAt(i, tabComponent);
 		}
 	}
 
@@ -994,13 +991,12 @@ public class TestPanelWindow implements IDestroyable {
 	private static final Color BG_SELECTED = new Color(0.8f, 0.8f, 1.0f);
 	private static final Color BG_NOT_SELECTED = Color.white;
 	private JPanel myWorkspacePanel;
+	private JPanel myEditorContentPanel;
 	private JButton myAddConnectionButton;
 	private JList myOutboundConnectionsList;
 	private JList myInboundConnectionsList;
 	private JScrollPane myLogScrollPane;
 	private BaseMainPanel myMainPanel;
-	private JButton myAddMessageButton;
-	private JButton myDeleteMessageButton;
 	private JButton myDeleteInboundConnectionButton;
 	private JMenuItem myShowLogConsoleMenuItem;
 	private JMenuItem mySaveMenuItem;
@@ -1021,52 +1017,6 @@ public class TestPanelWindow implements IDestroyable {
 	private JMenuItem myRevertToSavedMenuItem;
 	private JMenuItem fileSortMenuItem;
 
-	private final class MyMessageDescriptionListener implements PropertyChangeListener {
-		public void propertyChange(PropertyChangeEvent theEvt) {
-			Hl7V2MessageCollection source = (Hl7V2MessageCollection) theEvt.getSource();
-			for (int i = 0; i < myMessagesListModel.getSize(); i++) {
-				if (myMessagesListModel.elementAt(i) == source) {
-					myMessagesListModel.fireChangeAtRow(i);
-				}
-			}
-		}
-	}
-
-	private class MyMessagesListCellRencerer extends DefaultListCellRenderer {
-
-		/*
-		 * (non-Javadoc)
-		 * 
-		 * @see
-		 * javax.swing.DefaultListCellRenderer#getListCellRendererComponent(
-		 * javax.swing.JList, java.lang.Object, int, boolean, boolean)
-		 */
-		@Override
-		public Component getListCellRendererComponent(JList theList, Object theValue, int theIndex, boolean theIsSelected, boolean theCellHasFocus) {
-			if (theValue instanceof Hl7V2MessageCollection) {
-				setIcon(ImageFactory.getMessageHl7());
-
-				Hl7V2MessageCollection collection = (Hl7V2MessageCollection) theValue;
-				String description = collection.getMessageDescription();
-				if (collection.isSaved()) {
-					setText(description);
-				} else {
-					setText("<html><nobr><font color=\"red\" size=\"2\">unsaved</font> " + description + "</nobr></html>");
-				}
-
-				if (theValue == myController.getLeftSelectedItem()) {
-					setBackground(BG_SELECTED);
-				} else {
-					setBackground(BG_NOT_SELECTED);
-				}
-
-			} else {
-				ourLog.error("Unknown message element type: " + theValue.getClass().getName());
-			}
-			return this;
-		}
-
-	}
 
 	private class MyOutboundConnectionsListCellRenderer extends DefaultListCellRenderer {
 
@@ -1206,11 +1156,25 @@ public class TestPanelWindow implements IDestroyable {
 		myMainPanel = theOutboundPanel;
 		myMainPanel.addPropertyChangeListener(BaseMainPanel.PROP_WINDOWTITLE, myPanelTitleListener);
 
-		myWorkspacePanel.removeAll();
-		myWorkspacePanel.add(theOutboundPanel, BorderLayout.CENTER);
-		myWorkspacePanel.validate();
+		myEditorContentPanel.removeAll();
+		myEditorContentPanel.add(theOutboundPanel, BorderLayout.CENTER);
+		myEditorContentPanel.validate();
 
-		myMessagesList.repaint();
+		// Add the Sending activity table from the editor to the connections tabs
+		if (theOutboundPanel instanceof Hl7V2MessageEditorPanel) {
+			Hl7V2MessageEditorPanel editorPanel = (Hl7V2MessageEditorPanel) theOutboundPanel;
+			ActivityTable sendingTable = editorPanel.getSendingActivityTable();
+			// Remove any existing "Sending" tab if present
+			for (int i = myConnectionsTabPane.getTabCount() - 1; i >= 0; i--) {
+				if ("Sending".equals(myConnectionsTabPane.getTitleAt(i))) {
+					myConnectionsTabPane.removeTabAt(i);
+				}
+			}
+			// Add the Sending tab
+			myConnectionsTabPane.addTab("Sending", sendingTable);
+		}
+
+		myMessagesTabPane.repaint();
 		myInboundConnectionsList.repaint();
 		myOutboundConnectionsList.repaint();
 
@@ -1218,17 +1182,6 @@ public class TestPanelWindow implements IDestroyable {
 		updateWindowTitle();
 	}
 
-	private class MyMessagesListModel extends DefaultListModel implements PropertyChangeListener {
-
-		public void fireChangeAtRow(int theI) {
-			fireContentsChanged(this, theI, theI);
-		}
-
-		public void propertyChange(PropertyChangeEvent theEvt) {
-			updateMessagesList();
-		}
-
-	}
 
 	private class MyOutboundConnectionsListModel extends DefaultListModel {
 

@@ -120,7 +120,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		} catch (Throwable e) {
 			e.printStackTrace();
 		}
-		
+
 	}
 
 	private boolean myDontRespondToSourceMessageChanges;
@@ -244,9 +244,23 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 				theController.setMessageEditorInFollowMode(myFollowToggle.isSelected());
 			}
 		});
+
+		JToggleButton wrapLinesToggle = new JToggleButton("Wrap");
+		wrapLinesToggle.setToolTipText("Enable line wrapping in the editor");
+		wrapLinesToggle.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				if (wrapLinesToggle.isSelected()) {
+					myMessageScrollPane.setHorizontalScrollBarPolicy(javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+				} else {
+					myMessageScrollPane.setHorizontalScrollBarPolicy(javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+				}
+			}
+		});
 		myFollowToggle.setIcon(new ImageIcon(Hl7V2MessageEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/updown.png")));
 		myFollowToggle.setSelected(theController.isMessageEditorInFollowMode());
 		toolBar.add(myFollowToggle);
+
+		toolBar.add(wrapLinesToggle);
 
 		myhorizontalStrut = Box.createHorizontalStrut(20);
 		toolBar.add(myhorizontalStrut);
@@ -457,7 +471,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 		mySendingActivityTable = new ActivityTable();
 		mySendingActivityTable.setController(myController);
-		myTopTabBar.addTab("Sending", null, mySendingActivityTable, null);
+		// Note: mySendingActivityTable is added to the bottom connections tabs in TestPanelWindow
 
 		bottomPanel = new JPanel();
 		bottomPanel.setPreferredSize(new Dimension(10, 20));
@@ -1107,6 +1121,10 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 	public Frame getWindow() {
 		return myController.getWindow();
+	}
+
+	public ActivityTable getSendingActivityTable() {
+		return mySendingActivityTable;
 	}
 
 }
