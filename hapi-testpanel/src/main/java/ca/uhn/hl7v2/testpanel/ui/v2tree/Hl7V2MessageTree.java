@@ -731,12 +731,23 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		Type type = node.getType();
 		String fieldName = node.getName();
 
+		// Unwrap Varies types to get the actual type
+		if (type instanceof Varies) {
+			type = ((Varies) type).getData();
+		}
+
 		String newValue = null;
 		if (type instanceof Composite) {
 			newValue = showEditCompositeDialog(fieldName, (Composite) type);
 		} else {
 			String currentValue = node.getPipeEncodedValue();
-			newValue = showEditValueDialog(fieldName, currentValue, type);
+			Primitive primitive = (Primitive) type;
+			String typeName = primitive.getName();
+			if (isDateTimeType(typeName)) {
+				newValue = showEditDateTimeDialog(fieldName, currentValue, typeName);
+			} else {
+				newValue = showEditValueDialog(fieldName, currentValue, type);
+			}
 		}
 
 		if (newValue != null) {
@@ -771,6 +782,308 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 				javax.swing.JOptionPane.showMessageDialog(myTree, "Failed to update value: " + e.getMessage(), "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
 			}
 		}
+	}
+
+	private String showEditDateTimeDialog(String fieldName, String currentValue, String typeName) {
+		javax.swing.JDialog dialog = new javax.swing.JDialog();
+		dialog.setTitle("Edit: " + fieldName);
+		dialog.setDefaultCloseOperation(javax.swing.JDialog.DISPOSE_ON_CLOSE);
+		dialog.setModal(true);
+		dialog.setLocationRelativeTo(myTree);
+
+		javax.swing.JPanel mainPanel = new javax.swing.JPanel();
+		mainPanel.setLayout(new java.awt.GridBagLayout());
+		mainPanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+		java.awt.GridBagConstraints gbc = new java.awt.GridBagConstraints();
+		gbc.anchor = java.awt.GridBagConstraints.WEST;
+		gbc.insets = new java.awt.Insets(0, 0, 8, 10);
+
+		java.util.Map<String, String> components = parseDateTime(currentValue, typeName);
+
+		final javax.swing.JTextField[] fields = new javax.swing.JTextField[8];
+		int currentRow = 0;
+		int fieldIdx = 0;
+
+		// Date fields (for DT, DTM, and TS)
+		if ("DT".equals(typeName) || "DTM".equals(typeName) || "TS".equals(typeName)) {
+			gbc.gridx = 0;
+			gbc.gridy = currentRow;
+			mainPanel.add(new javax.swing.JLabel("Date (YYYY-MM-DD):"), gbc);
+
+			javax.swing.JPanel datePanel = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 3, 0));
+			fields[fieldIdx] = new javax.swing.JTextField(components.get("year"), 4);
+			fields[fieldIdx].setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 12));
+			datePanel.add(fields[fieldIdx]);
+			datePanel.add(new javax.swing.JLabel("-"));
+			fieldIdx++;
+
+			fields[fieldIdx] = new javax.swing.JTextField(components.get("month"), 2);
+			fields[fieldIdx].setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 12));
+			datePanel.add(fields[fieldIdx]);
+			datePanel.add(new javax.swing.JLabel("-"));
+			fieldIdx++;
+
+			fields[fieldIdx] = new javax.swing.JTextField(components.get("day"), 2);
+			fields[fieldIdx].setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 12));
+			datePanel.add(fields[fieldIdx]);
+			fieldIdx++;
+
+			gbc.gridx = 1;
+			gbc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+			gbc.weightx = 1.0;
+			mainPanel.add(datePanel, gbc);
+			currentRow++;
+		}
+
+		// Time fields (for DTM, TS, and TM)
+		if ("DTM".equals(typeName) || "TS".equals(typeName) || "TM".equals(typeName)) {
+			gbc.gridx = 0;
+			gbc.gridy = currentRow;
+			gbc.fill = java.awt.GridBagConstraints.NONE;
+			gbc.weightx = 0;
+			mainPanel.add(new javax.swing.JLabel("Time (HH:MM:SS):"), gbc);
+
+			javax.swing.JPanel timePanel = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 3, 0));
+			fields[fieldIdx] = new javax.swing.JTextField(components.get("hour"), 2);
+			fields[fieldIdx].setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 12));
+			timePanel.add(fields[fieldIdx]);
+			timePanel.add(new javax.swing.JLabel(":"));
+			fieldIdx++;
+
+			fields[fieldIdx] = new javax.swing.JTextField(components.get("minute"), 2);
+			fields[fieldIdx].setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 12));
+			timePanel.add(fields[fieldIdx]);
+			timePanel.add(new javax.swing.JLabel(":"));
+			fieldIdx++;
+
+			fields[fieldIdx] = new javax.swing.JTextField(components.get("second"), 2);
+			fields[fieldIdx].setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 12));
+			timePanel.add(fields[fieldIdx]);
+			fieldIdx++;
+
+			gbc.gridx = 1;
+			gbc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+			gbc.weightx = 1.0;
+			mainPanel.add(timePanel, gbc);
+			currentRow++;
+		}
+
+		// Milliseconds field (optional for DTM, TS, and TM)
+		if ("DTM".equals(typeName) || "TS".equals(typeName) || "TM".equals(typeName)) {
+			gbc.gridx = 0;
+			gbc.gridy = currentRow;
+			gbc.fill = java.awt.GridBagConstraints.NONE;
+			gbc.weightx = 0;
+			mainPanel.add(new javax.swing.JLabel("Milliseconds (optional):"), gbc);
+
+			fields[fieldIdx] = new javax.swing.JTextField(components.get("millis"), 3);
+			fields[fieldIdx].setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 12));
+
+			gbc.gridx = 1;
+			gbc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+			gbc.weightx = 1.0;
+			mainPanel.add(fields[fieldIdx], gbc);
+			fieldIdx++;
+			currentRow++;
+		}
+
+		// Timezone field (optional for DTM, TS, and TM)
+		if ("DTM".equals(typeName) || "TS".equals(typeName) || "TM".equals(typeName)) {
+			gbc.gridx = 0;
+			gbc.gridy = currentRow;
+			gbc.fill = java.awt.GridBagConstraints.NONE;
+			gbc.weightx = 0;
+			mainPanel.add(new javax.swing.JLabel("Timezone (e.g., -0500):"), gbc);
+
+			fields[fieldIdx] = new javax.swing.JTextField(components.get("timezone"), 5);
+			fields[fieldIdx].setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 12));
+
+			gbc.gridx = 1;
+			gbc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+			gbc.weightx = 1.0;
+			mainPanel.add(fields[fieldIdx], gbc);
+			currentRow++;
+		}
+
+		// Preview label
+		gbc.gridx = 0;
+		gbc.gridy = currentRow;
+		gbc.fill = java.awt.GridBagConstraints.NONE;
+		gbc.weightx = 0;
+		gbc.insets = new java.awt.Insets(10, 0, 5, 10);
+		mainPanel.add(new javax.swing.JLabel("Preview:"), gbc);
+
+		javax.swing.JLabel previewLabel = new javax.swing.JLabel(currentValue != null ? currentValue : "");
+		previewLabel.setFont(new java.awt.Font("Monospaced", java.awt.Font.BOLD, 12));
+		previewLabel.setForeground(java.awt.Color.BLUE);
+
+		gbc.gridx = 1;
+		gbc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+		gbc.weightx = 1.0;
+		mainPanel.add(previewLabel, gbc);
+
+		// Update preview as fields change
+		javax.swing.event.DocumentListener docListener = new javax.swing.event.DocumentListener() {
+			public void insertUpdate(javax.swing.event.DocumentEvent e) {
+				updatePreview();
+			}
+			public void removeUpdate(javax.swing.event.DocumentEvent e) {
+				updatePreview();
+			}
+			public void changedUpdate(javax.swing.event.DocumentEvent e) {
+				updatePreview();
+			}
+			private void updatePreview() {
+				String preview = formatDateTime(fields, typeName);
+				previewLabel.setText(preview != null ? preview : "");
+			}
+		};
+
+		for (javax.swing.JTextField field : fields) {
+			if (field != null) {
+				field.getDocument().addDocumentListener(docListener);
+			}
+		}
+
+		// Buttons
+		gbc.gridx = 0;
+		gbc.gridy = currentRow + 1;
+		gbc.gridwidth = 2;
+		gbc.anchor = java.awt.GridBagConstraints.WEST;
+		gbc.fill = java.awt.GridBagConstraints.NONE;
+		gbc.weightx = 1.0;
+		gbc.insets = new java.awt.Insets(10, 0, 0, 0);
+
+		javax.swing.JPanel buttonPanel = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 5, 0));
+		javax.swing.JButton setNowButton = new javax.swing.JButton("Set to Now");
+
+		final String[] result = new String[1];
+
+		setNowButton.addActionListener(e -> {
+			java.time.LocalDateTime now = java.time.LocalDateTime.now();
+			if ("DT".equals(typeName)) {
+				fields[0].setText(String.format("%04d", now.getYear()));
+				fields[1].setText(String.format("%02d", now.getMonthValue()));
+				fields[2].setText(String.format("%02d", now.getDayOfMonth()));
+			} else if ("DTM".equals(typeName) || "TS".equals(typeName)) {
+				fields[0].setText(String.format("%04d", now.getYear()));
+				fields[1].setText(String.format("%02d", now.getMonthValue()));
+				fields[2].setText(String.format("%02d", now.getDayOfMonth()));
+				fields[3].setText(String.format("%02d", now.getHour()));
+				fields[4].setText(String.format("%02d", now.getMinute()));
+				fields[5].setText(String.format("%02d", now.getSecond()));
+				fields[6].setText("");
+				fields[7].setText("");
+			} else if ("TM".equals(typeName)) {
+				fields[0].setText(String.format("%02d", now.getHour()));
+				fields[1].setText(String.format("%02d", now.getMinute()));
+				fields[2].setText(String.format("%02d", now.getSecond()));
+				fields[3].setText("");
+				fields[4].setText("");
+			}
+		});
+
+		buttonPanel.add(setNowButton);
+
+		gbc.anchor = java.awt.GridBagConstraints.EAST;
+		gbc.weightx = 0;
+		javax.swing.JPanel rightButtonPanel = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 5, 0));
+		javax.swing.JButton okButton = new javax.swing.JButton("OK");
+		javax.swing.JButton cancelButton = new javax.swing.JButton("Cancel");
+
+		okButton.addActionListener(e -> {
+			String formatted = formatDateTime(fields, typeName);
+			if (formatted != null) {
+				result[0] = formatted;
+				dialog.dispose();
+			} else {
+				javax.swing.JOptionPane.showMessageDialog(dialog, "Invalid date/time format", "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
+			}
+		});
+
+		cancelButton.addActionListener(e -> {
+			result[0] = null;
+			dialog.dispose();
+		});
+
+		rightButtonPanel.add(okButton);
+		rightButtonPanel.add(cancelButton);
+		buttonPanel.add(rightButtonPanel);
+		mainPanel.add(buttonPanel, gbc);
+
+		dialog.getContentPane().add(mainPanel);
+		dialog.setSize(450, 300);
+		dialog.setVisible(true);
+
+		return result[0];
+	}
+
+	private String formatDateTime(javax.swing.JTextField[] fields, String typeName) {
+		if ("DT".equals(typeName)) {
+			String year = fields[0] != null ? fields[0].getText() : "";
+			String month = fields[1] != null ? fields[1].getText() : "";
+			String day = fields[2] != null ? fields[2].getText() : "";
+			if (year.length() != 4 || month.length() != 2 || day.length() != 2) {
+				return null;
+			}
+			return year + month + day;
+		} else if ("DTM".equals(typeName) || "TS".equals(typeName)) {
+			String year = fields[0] != null ? fields[0].getText() : "";
+			String month = fields[1] != null ? fields[1].getText() : "";
+			String day = fields[2] != null ? fields[2].getText() : "";
+			String hour = fields[3] != null ? fields[3].getText() : "";
+			String minute = fields[4] != null ? fields[4].getText() : "";
+			String second = fields[5] != null ? fields[5].getText() : "";
+			String millis = fields[6] != null ? fields[6].getText().trim() : "";
+			String timezone = fields[7] != null ? fields[7].getText().trim() : "";
+
+			if (year.length() != 4 || month.length() != 2 || day.length() != 2) {
+				return null;
+			}
+
+			// For DTM/TS: either no time, or full time (HHMMSS)
+			boolean hasTime = !hour.isEmpty() || !minute.isEmpty() || !second.isEmpty();
+			if (hasTime) {
+				if (hour.length() != 2 || minute.length() != 2 || second.length() != 2) {
+					return null;
+				}
+			}
+
+			StringBuilder result = new StringBuilder();
+			result.append(year).append(month).append(day);
+			if (hasTime) {
+				result.append(hour).append(minute).append(second);
+				if (!millis.isEmpty()) {
+					result.append(".").append(millis);
+				}
+				if (!timezone.isEmpty()) {
+					result.append(timezone);
+				}
+			}
+			return result.toString();
+		} else if ("TM".equals(typeName)) {
+			String hour = fields[0] != null ? fields[0].getText() : "";
+			String minute = fields[1] != null ? fields[1].getText() : "";
+			String second = fields[2] != null ? fields[2].getText() : "";
+			String millis = fields[3] != null ? fields[3].getText().trim() : "";
+			String timezone = fields[4] != null ? fields[4].getText().trim() : "";
+
+			if (hour.length() != 2 || minute.length() != 2 || second.length() != 2) {
+				return null;
+			}
+
+			StringBuilder result = new StringBuilder();
+			result.append(hour).append(minute).append(second);
+			if (!millis.isEmpty()) {
+				result.append(".").append(millis);
+			}
+			if (!timezone.isEmpty()) {
+				result.append(timezone);
+			}
+			return result.toString();
+		}
+		return null;
 	}
 
 	private String showEditCompositeDialog(String fieldName, Composite composite) {
@@ -1016,6 +1329,100 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		dialog.setVisible(true);
 
 		return result[0];
+	}
+
+	private boolean isDateTimeType(String typeName) {
+		return "DT".equals(typeName) || "DTM".equals(typeName) || "TM".equals(typeName) || "TS".equals(typeName);
+	}
+
+	private java.util.Map<String, String> parseDateTime(String value, String typeName) {
+		java.util.Map<String, String> components = new java.util.HashMap<>();
+		java.time.LocalDateTime now = java.time.LocalDateTime.now();
+		java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+		java.time.format.DateTimeFormatter timeFormatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss");
+
+		String year = String.format("%04d", now.getYear());
+		String month = String.format("%02d", now.getMonthValue());
+		String day = String.format("%02d", now.getDayOfMonth());
+		String hour = String.format("%02d", now.getHour());
+		String minute = String.format("%02d", now.getMinute());
+		String second = String.format("%02d", now.getSecond());
+		String millis = "";
+		String timezone = "";
+
+		if (value != null && !value.isEmpty()) {
+			try {
+				if ("DT".equals(typeName)) {
+					if (value.length() >= 8) {
+						year = value.substring(0, 4);
+						month = value.substring(4, 6);
+						day = value.substring(6, 8);
+					}
+				} else if ("DTM".equals(typeName) || "TS".equals(typeName)) {
+					if (value.length() >= 8) {
+						year = value.substring(0, 4);
+						month = value.substring(4, 6);
+						day = value.substring(6, 8);
+					}
+					if (value.length() >= 14) {
+						hour = value.substring(8, 10);
+						minute = value.substring(10, 12);
+						second = value.substring(12, 14);
+					}
+					if (value.contains(".")) {
+						int dotIdx = value.indexOf('.');
+						int endIdx = value.length();
+						for (int i = dotIdx + 1; i < value.length(); i++) {
+							char c = value.charAt(i);
+							if (c == '-' || c == '+') {
+								endIdx = i;
+								break;
+							}
+						}
+						millis = value.substring(dotIdx + 1, endIdx);
+					}
+					if (value.contains("-") || value.contains("+")) {
+						int tzIdx = Math.max(value.lastIndexOf('-'), value.lastIndexOf('+'));
+						timezone = value.substring(tzIdx);
+					}
+				} else if ("TM".equals(typeName)) {
+					if (value.length() >= 6) {
+						hour = value.substring(0, 2);
+						minute = value.substring(2, 4);
+						second = value.substring(4, 6);
+					}
+					if (value.contains(".")) {
+						int dotIdx = value.indexOf('.');
+						int endIdx = value.length();
+						for (int i = dotIdx + 1; i < value.length(); i++) {
+							char c = value.charAt(i);
+							if (c == '-' || c == '+') {
+								endIdx = i;
+								break;
+							}
+						}
+						millis = value.substring(dotIdx + 1, endIdx);
+					}
+					if (value.contains("-") || value.contains("+")) {
+						int tzIdx = Math.max(value.lastIndexOf('-'), value.lastIndexOf('+'));
+						timezone = value.substring(tzIdx);
+					}
+				}
+			} catch (Exception e) {
+				ourLog.debug("Could not parse datetime value: " + value, e);
+			}
+		}
+
+		components.put("year", year);
+		components.put("month", month);
+		components.put("day", day);
+		components.put("hour", hour);
+		components.put("minute", minute);
+		components.put("second", second);
+		components.put("millis", millis);
+		components.put("timezone", timezone);
+
+		return components;
 	}
 
 	private void updateNodeValue(TreeNodeType node, String newValue) throws HL7Exception {
