@@ -577,10 +577,15 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 					myController.invokeInBackground(new Runnable() {
 						public void run() {
 							myMessage.setHighlitedPathBasedOnRange(new Range(theE.getDot(), theE.getMark()));
-							if (myFollowToggle.isSelected()) {
-								myTreePanel.synchronizeTreeWithHighlitedPath();
-							}
-							myTreePanel.repaint();
+							final boolean shouldFollow = myFollowToggle.isSelected();
+							SwingUtilities.invokeLater(new Runnable() {
+								public void run() {
+									if (shouldFollow) {
+										myTreePanel.synchronizeTreeWithHighlitedPath();
+									}
+									myTreePanel.repaint();
+								}
+							});
 						}});
 				}
 			}
@@ -865,19 +870,19 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 		char[] chars = sourceMessage.toCharArray();
 
-		// Find start of field (go back until we hit field separator or start of string)
+		// Find start of field (go back until we hit field separator, line break, or start of string)
 		while (fieldStart > 0) {
 			char c = chars[fieldStart - 1];
-			if (c == fieldSep) {
+			if (c == fieldSep || c == '\n') {
 				break;
 			}
 			fieldStart--;
 		}
 
-		// Find end of field (go forward until we hit field separator or end of string)
+		// Find end of field (go forward until we hit field separator, line break, or end of string)
 		while (fieldEnd < chars.length) {
 			char c = chars[fieldEnd];
-			if (c == fieldSep) {
+			if (c == fieldSep || c == '\n') {
 				break;
 			}
 			fieldEnd++;

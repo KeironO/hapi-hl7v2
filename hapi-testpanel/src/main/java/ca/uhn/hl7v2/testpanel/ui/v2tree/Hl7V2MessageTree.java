@@ -555,10 +555,13 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		}
 
 		int currentMessageIndex = -1;
-		int currentSelectedRow = -1;
+		int bestMatchRow = -1;
+		int bestMatchScore = -1;
 		for (int row = 0; row < myTree.getRowCount(); row++) {
 			TreePath path = myTree.getPathForRow(row);
-			if (path == null) continue;
+			if (path == null) {
+				continue;
+			}
 
 			Object component = path.getLastPathComponent();
 			if (component instanceof TreeNodeMessage) {
@@ -576,19 +579,63 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 			if (component instanceof TreeNodeBase) {
 				TreeNodeBase node = (TreeNodeBase) component;
 				String terserPath = (currentMessageIndex) + node.getTerserPath();
-				if (highlitedPath != null && highlitedPath.startsWith(terserPath) && !highlitedPath.startsWith(terserPath + "(")) {
+
+				int matchScore = calculateMatchScore(highlitedPath, terserPath);
+
+				if (matchScore > bestMatchScore) {
+					bestMatchScore = matchScore;
+					bestMatchRow = row;
+				}
+
+				if (matchScore > 0) {
 					myTree.expandPath(path);
-					if (highlitedPath.equals(terserPath)) {
-						currentSelectedRow = row;
-						myTree.setSelectionRow(row);
-					}
 				}
 			}
 		}
 
-		if (currentSelectedRow != -1 && !myRespondingToManualRangeChange) {
-			myTree.scrollRowToVisible(currentSelectedRow);
+		if (bestMatchRow != -1 && !myRespondingToManualRangeChange) {
+			myTree.setSelectionRow(bestMatchRow);
+			myTree.scrollRowToVisible(bestMatchRow);
 		}
+	}
+
+	private int calculateMatchScore(String highlitedPath, String terserPath) {
+		if (highlitedPath.equals(terserPath)) {
+			return 100;
+		}
+
+		int parenIndex = terserPath.indexOf('(');
+		String baseField = parenIndex > 0 ? terserPath.substring(0, parenIndex) : terserPath;
+
+		if (highlitedPath.equals(baseField)) {
+			return 75;
+		}
+		if (highlitedPath.startsWith(terserPath + "(")) {
+			return 50;
+		}
+		if (highlitedPath.startsWith(terserPath)) {
+			return 25;
+		}
+		if (highlitedPath.startsWith(baseField + "-")) {
+			int highlitedDepth = countDashes(highlitedPath);
+			int terserDepth = countDashes(terserPath);
+			if (highlitedDepth == terserDepth) {
+				return 90;
+			} else if (highlitedDepth > terserDepth) {
+				return 85 - Math.min(10, (highlitedDepth - terserDepth) * 2);
+			}
+		}
+		return 0;
+	}
+
+	private int countDashes(String path) {
+		int count = 0;
+		for (int i = 0; i < path.length(); i++) {
+			if (path.charAt(i) == '-') {
+				count++;
+			}
+		}
+		return count;
 	}
 
 	public void expandAll() {
@@ -1690,11 +1737,21 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 			super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus);
 			if (value instanceof TreeNodeMessage) {
 				TreeNodeMessage tnm = (TreeNodeMessage) value;
-				setText("<html>" + tnm.getMessage().getMessageDescription() + "</html>");
+				String text = tnm.getMessage().getMessageDescription();
+				if (selected) {
+					text = "<html><font color=\"white\">" + text + "</font></html>";
+				} else {
+					text = "<html>" + text + "</html>";
+				}
+				setText(text);
 				setIcon(ImageFactory.getTreeBundle());
 			} else if (value instanceof TreeNodeBase) {
 				TreeNodeBase node = (TreeNodeBase) value;
-				setText("<html>" + node.getNodeText().toString() + "</html>");
+				String nodeText = node.getNodeText().toString();
+				if (selected) {
+					nodeText = nodeText.replaceAll("color=\"[^\"]*\"", "color=\"white\"");
+				}
+				setText("<html>" + nodeText + "</html>");
 				if (node instanceof TreeNodeGroup) {
 					setIcon(ImageFactory.getTreeBundle());
 				} else if (node instanceof TreeNodeSegment) {
