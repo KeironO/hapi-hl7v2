@@ -633,8 +633,6 @@ public class TestPanelWindow implements IDestroyable {
 		myEditorInnerPanel.setLayout(new BorderLayout(0, 0));
 		myEditorContentPanel.add(myEditorInnerPanel, BorderLayout.CENTER);
 
-		centerPanel.add(myEditorContentPanel, BorderLayout.CENTER);
-
 		// Add log as a tab in the connections pane
 		myLogScrollPane = new LogTable();
 		myLogTabIndex = 3;
@@ -653,8 +651,12 @@ public class TestPanelWindow implements IDestroyable {
 		myValidationTabIndex = 4;
 		myConnectionsTabPane.addTab("Validation Errors (0)", validationPanel);
 
-		// Add connections tabs to the bottom
-		centerPanel.add(myConnectionsTabPane, BorderLayout.SOUTH);
+		// Add resizable connections pane to the bottom with a split divider
+		JSplitPane editorSplitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, myEditorContentPanel, myConnectionsTabPane);
+		editorSplitPane.setDividerLocation(0.85);
+		editorSplitPane.setOneTouchExpandable(true);
+		editorSplitPane.setBorder(null);
+		centerPanel.add(editorSplitPane, BorderLayout.CENTER);
 
 		updateLogScrollPaneVisibility();
 
