@@ -29,6 +29,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.io.File;
 import java.awt.Frame;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -597,18 +598,41 @@ public class TestPanelWindow implements IDestroyable {
 		myWorkspacePanel.setLayout(new BorderLayout(0, 0));
 		mainPanel.add(myWorkspacePanel, BorderLayout.CENTER);
 
+		// Status bar footer
+		JPanel statusBarPanel = new JPanel(new BorderLayout());
+		statusBarPanel.setBorder(javax.swing.BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(200, 200, 200)));
+
+		myStatusBar = new JLabel(" No workspace open");
+		myStatusBar.setBorder(javax.swing.BorderFactory.createEmptyBorder(3, 8, 3, 8));
+		myStatusBar.setFont(myStatusBar.getFont().deriveFont(11f));
+		myStatusBar.setForeground(new Color(100, 100, 100));
+		statusBarPanel.add(myStatusBar, BorderLayout.WEST);
+
+		myTerserPathStatusLabel = new JLabel();
+		myTerserPathStatusLabel.setBorder(javax.swing.BorderFactory.createEmptyBorder(3, 8, 3, 8));
+		myTerserPathStatusLabel.setFont(myTerserPathStatusLabel.getFont().deriveFont(11f));
+		myTerserPathStatusLabel.setForeground(new Color(60, 100, 180));
+		statusBarPanel.add(myTerserPathStatusLabel, BorderLayout.EAST);
+
+		mainPanel.add(statusBarPanel, BorderLayout.SOUTH);
+
 		// Create container for tabs and editor
 		JPanel centerPanel = new JPanel();
 		centerPanel.setLayout(new BorderLayout(0, 0));
 		myWorkspacePanel.add(centerPanel, BorderLayout.CENTER);
 
-		// Add the message tabs
-		centerPanel.add(myMessagesTabPane, BorderLayout.NORTH);
-
-		// Create a separate panel for the editor content
+		// Outer editor panel: tabs fixed at top, swappable content below
 		myEditorContentPanel = new JPanel();
 		myEditorContentPanel.setBorder(null);
 		myEditorContentPanel.setLayout(new BorderLayout(0, 0));
+		myEditorContentPanel.add(myMessagesTabPane, BorderLayout.NORTH);
+
+		// Inner panel — only this gets swapped by setMainPanel
+		myEditorInnerPanel = new JPanel();
+		myEditorInnerPanel.setBorder(null);
+		myEditorInnerPanel.setLayout(new BorderLayout(0, 0));
+		myEditorContentPanel.add(myEditorInnerPanel, BorderLayout.CENTER);
+
 		centerPanel.add(myEditorContentPanel, BorderLayout.CENTER);
 
 		// Add log as a tab in the connections pane
@@ -728,6 +752,20 @@ public class TestPanelWindow implements IDestroyable {
 		JMenu fileMenu = new JMenu("File");
 		fileMenu.setMnemonic('f');
 		menuBar.add(fileMenu);
+
+		myNewWorkspaceMenuItem = new JMenuItem("New Workspace...");
+		myNewWorkspaceMenuItem.addActionListener(e -> myController.newWorkspace());
+		fileMenu.add(myNewWorkspaceMenuItem);
+
+		myOpenWorkspaceMenuItem = new JMenuItem("Open Workspace...");
+		myOpenWorkspaceMenuItem.addActionListener(e -> myController.openWorkspace());
+		fileMenu.add(myOpenWorkspaceMenuItem);
+
+		myCloseWorkspaceMenuItem = new JMenuItem("Close Workspace");
+		myCloseWorkspaceMenuItem.addActionListener(e -> myController.closeWorkspace());
+		fileMenu.add(myCloseWorkspaceMenuItem);
+
+		fileMenu.addSeparator();
 
 		JMenuItem newMessageMenuItem = new JMenuItem("New Message...");
 		newMessageMenuItem.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/message_hl7.png")));
@@ -855,6 +893,30 @@ public class TestPanelWindow implements IDestroyable {
 
 		updateLeftToolbarInboundStatusButtons();
 		updateLeftToolbarOutboundStatusButtons();
+
+		myCloseWorkspaceMenuItem.setEnabled(myController.getWorkspaceController().hasWorkspace());
+		if (myController.getWorkspaceController().hasWorkspace()) {
+			myStatusBar.setText(" Workspace: " + myController.getWorkspaceController().getWorkspaceFile().getAbsolutePath());
+		}
+	}
+
+	public void rebindConnectionLists() {
+		// Detach old listeners (they may be attached to now-replaced list instances)
+		myController.getOutboundConnectionList().removePropertyChangeListener(OutboundConnectionList.PROP_LIST, myOutboundConnectionsListListener);
+		myController.getInboundConnectionList().removePropertyChangeListener(InboundConnectionList.PROP_LIST, myInboundConnectionsListListener);
+
+		// Clear the UI list models
+		myOutboundConnectionsListModel.clear();
+		myInboundConnectionsListModel.clear();
+
+		// Reattach to the current (possibly new) list instances
+		myController.getOutboundConnectionList().addPropertyChangeListener(OutboundConnectionList.PROP_LIST, myOutboundConnectionsListListener);
+		myController.getInboundConnectionList().addPropertyChangeListener(InboundConnectionList.PROP_LIST, myInboundConnectionsListListener);
+
+		updateOutboundConnectionsList();
+		updateInboundConnectionsList();
+		updateLeftToolbarOutboundStatusButtons();
+		updateLeftToolbarInboundStatusButtons();
 	}
 
 	public void updateOutboundConnectionsList() {
@@ -1073,6 +1135,12 @@ public class TestPanelWindow implements IDestroyable {
 	private static final Color BG_NOT_SELECTED = Color.white;
 	private JPanel myWorkspacePanel;
 	private JPanel myEditorContentPanel;
+	private JPanel myEditorInnerPanel;
+	private JLabel myStatusBar;
+	private JLabel myTerserPathStatusLabel;
+	private JMenuItem myNewWorkspaceMenuItem;
+	private JMenuItem myOpenWorkspaceMenuItem;
+	private JMenuItem myCloseWorkspaceMenuItem;
 	private JButton myAddConnectionButton;
 	private JList myOutboundConnectionsList;
 	private JList myInboundConnectionsList;
@@ -1238,20 +1306,26 @@ public class TestPanelWindow implements IDestroyable {
 		myMainPanel = theOutboundPanel;
 		myMainPanel.addPropertyChangeListener(BaseMainPanel.PROP_WINDOWTITLE, myPanelTitleListener);
 
-		myEditorContentPanel.removeAll();
-		myEditorContentPanel.add(theOutboundPanel, BorderLayout.CENTER);
-		myEditorContentPanel.validate();
+		myEditorInnerPanel.removeAll();
+		myEditorInnerPanel.add(theOutboundPanel, BorderLayout.CENTER);
+		myEditorInnerPanel.validate();
 
-		// Update the Sending activity table from the editor to the connections tabs
+		// Update the Sending activity table and terser path label for editor panels
 		if (theOutboundPanel instanceof Hl7V2MessageEditorPanel) {
 			Hl7V2MessageEditorPanel editorPanel = (Hl7V2MessageEditorPanel) theOutboundPanel;
 			editorPanel.setTestPanelWindow(this);
 			ActivityTable sendingTable = editorPanel.getSendingActivityTable();
-			// Find and update the "Sending" tab (it's at index 2)
 			int sendingTabIndex = 2;
 			if (sendingTabIndex < myConnectionsTabPane.getTabCount()) {
 				myConnectionsTabPane.setComponentAt(sendingTabIndex, sendingTable);
 			}
+			// Mirror the terser path label into the status bar
+			JLabel terserLabel = editorPanel.getTerserPathLabel();
+			terserLabel.addPropertyChangeListener("text", evt ->
+				myTerserPathStatusLabel.setText((String) evt.getNewValue()));
+			myTerserPathStatusLabel.setText(terserLabel.getText());
+		} else {
+			myTerserPathStatusLabel.setText(null);
 		}
 
 		myMessagesTabPane.repaint();
@@ -1308,6 +1382,21 @@ public class TestPanelWindow implements IDestroyable {
 			myAboutDialog = new AboutDialog();
 		}
 		myAboutDialog.setVisible(true);
+	}
+
+	public void onWorkspaceChanged() {
+		ca.uhn.hl7v2.testpanel.controller.WorkspaceController wsc = myController.getWorkspaceController();
+		boolean hasWorkspace = wsc.hasWorkspace();
+		myCloseWorkspaceMenuItem.setEnabled(hasWorkspace);
+
+		if (hasWorkspace) {
+			File root = wsc.getRootFolder();
+			myStatusBar.setText(" Workspace: " + wsc.getWorkspaceFile().getAbsolutePath());
+			myframe.setTitle("HAPI TestPanel - " + root.getName());
+		} else {
+			myStatusBar.setText(" No workspace open");
+			updateWindowTitle();
+		}
 	}
 
 	public void setRecentMessageFiles(List<Hl7V2MessageCollection> theList) {

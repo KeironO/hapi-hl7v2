@@ -107,6 +107,7 @@ public class Controller {
 	private JFileChooser myConformanceProfileFileChooser;
 	private ExecutorService myExecutor;
 	private InboundConnectionList myInboundConnectionList;
+	private WorkspaceController myWorkspaceController;
 	private Object myLeftSelectedItem;
 	private boolean myMessageEditorInFollowMode = true;
 	private MessagesList myMessagesList;
@@ -123,6 +124,7 @@ public class Controller {
 	private TestPanelWindow myView;
 
 	public Controller() {
+		myWorkspaceController = new WorkspaceController(this);
 		myTableFileList = new TableFileList();
 		myProfileFileList = new ProfileFileList(myTableFileList);
 
@@ -288,6 +290,11 @@ public class Controller {
 			return;
 		}
 
+		// Persist workspace if one is open, otherwise fall back to global prefs
+		if (myWorkspaceController.hasWorkspace()) {
+			saveWorkspaceState();
+		}
+
 		myOutboundConnectionList.removeNonPersistantConnections();
 		ourLog.info("Saving {} outbound connection descriptors", myOutboundConnectionList.getConnections().size());
 		Prefs.getInstance().setOutboundConnectionList(myOutboundConnectionList.exportConfigToXml());
@@ -346,6 +353,8 @@ public class Controller {
 		} else {
 			tryToSelectSomething();
 		}
+
+		saveWorkspaceState();
 	}
 
 	private void createDefaultInboundConnectionList() {
@@ -517,8 +526,16 @@ public class Controller {
 		return myMessageEditorInFollowMode;
 	}
 
-	private void openMessageFile(File file, Charset theCharset) {
+	public void openMessageFile(File file, Charset theCharset) {
 		try {
+			// Don't re-open if already open
+			for (Hl7V2MessageCollection existing : myMessagesList.getMessages()) {
+				if (file.getAbsolutePath().equals(existing.getSaveFileName())) {
+					setLeftSelectedItem(existing);
+					return;
+				}
+			}
+
 			String profileString = FileUtils.readFile(file, theCharset);
 			Hl7V2MessageCollection col = new Hl7V2MessageCollection();
 
@@ -529,10 +546,9 @@ public class Controller {
 			if (col.getMessages().isEmpty()) {
 				showDialogError("No messages were found in the file");
 			} else {
-
 				setLeftSelectedItem(col);
 				myMessagesList.addMessage(col);
-
+				saveWorkspaceState();
 			}
 		} catch (IOException e) {
 			ourLog.error("Failed to load profile", e);
@@ -540,8 +556,12 @@ public class Controller {
 	}
 
 	public void openMessages() {
+		String openDir = myWorkspaceController.hasWorkspace()
+			? myWorkspaceController.getRootFolder().getAbsolutePath()
+			: Prefs.getInstance().getOpenPathMessages();
+
 		if (myOpenMessagesFileChooser == null) {
-			myOpenMessagesFileChooser = new JFileChooser(Prefs.getInstance().getOpenPathMessages());
+			myOpenMessagesFileChooser = new JFileChooser(openDir);
 			myOpenMessagesFileChooserAccessory = new FileChooserOpenAccessory();
 			myOpenMessagesFileChooser.setAccessory(myOpenMessagesFileChooserAccessory);
 			myOpenMessagesFileChooser.setDialogTitle("Choose a file containing HL7 messages");
@@ -554,6 +574,8 @@ public class Controller {
 
 			type = new AllFileFilter();
 			myOpenMessagesFileChooser.addChoosableFileFilter(type);
+		} else if (myWorkspaceController.hasWorkspace()) {
+			myOpenMessagesFileChooser.setCurrentDirectory(myWorkspaceController.getRootFolder());
 		}
 
 		int value = myOpenMessagesFileChooser.showOpenDialog(myView.getFrame());
@@ -729,8 +751,12 @@ public class Controller {
 	public boolean saveMessagesAs(Hl7V2MessageCollection theSelectedValue) {
 		Validate.notNull(theSelectedValue);
 
+		String saveDir = myWorkspaceController.hasWorkspace()
+			? myWorkspaceController.getRootFolder().getAbsolutePath()
+			: Prefs.getInstance().getSavePathMessages();
+
 		if (mySaveMessagesFileChooser == null) {
-			mySaveMessagesFileChooser = new JFileChooser(Prefs.getInstance().getSavePathMessages());
+			mySaveMessagesFileChooser = new JFileChooser(saveDir);
 			mySaveMessagesFileChooser.setDialogTitle("Choose a file to save the current message(s) to");
 			mySaveMessagesFileChooserAccessory = new FileChooserSaveAccessory();
 			mySaveMessagesFileChooser.setAccessory(mySaveMessagesFileChooserAccessory);
@@ -745,7 +771,11 @@ public class Controller {
 			mySaveMessagesFileChooser.addChoosableFileFilter(type);
 
 			mySaveMessagesFileChooser.setPreferredSize(new Dimension(700, 500));
+		} else if (myWorkspaceController.hasWorkspace()) {
+			mySaveMessagesFileChooser.setCurrentDirectory(myWorkspaceController.getRootFolder());
 		}
+
+		mySaveMessagesFileChooser.setSelectedFile(new File(suggestSaveFileName(theSelectedValue)));
 
 		int value = mySaveMessagesFileChooser.showSaveDialog(myView.getFrame());
 		if (value == JFileChooser.APPROVE_OPTION) {
@@ -881,6 +911,153 @@ public class Controller {
 		return JOptionPane.showConfirmDialog(parentComponent, message, title, optionType, messageType);
 	}
 
+	private String suggestSaveFileName(Hl7V2MessageCollection theCollection) {
+		for (ca.uhn.hl7v2.testpanel.model.msg.AbstractMessage<?> msg : theCollection.getMessages()) {
+			if (msg instanceof ca.uhn.hl7v2.testpanel.model.msg.Hl7V2MessageBase) {
+				ca.uhn.hl7v2.testpanel.model.msg.Hl7V2MessageBase base =
+					(ca.uhn.hl7v2.testpanel.model.msg.Hl7V2MessageBase) msg;
+				try {
+					ca.uhn.hl7v2.util.Terser t = new ca.uhn.hl7v2.util.Terser(base.getParsedMessage());
+					String type    = t.get("/.MSH-9-1");
+					String trigger = t.get("/.MSH-9-2");
+					String control = t.get("/.MSH-10");
+					StringBuilder name = new StringBuilder();
+					if (isNotBlank(type))    name.append(type);
+					if (isNotBlank(trigger)) { if (name.length() > 0) name.append("_"); name.append(trigger); }
+					if (isNotBlank(control)) { if (name.length() > 0) name.append("_"); name.append(control); }
+					if (name.length() > 0) {
+						// Strip characters not safe for filenames
+						return name.toString().replaceAll("[^A-Za-z0-9_\\-]", "_");
+					}
+				} catch (Exception e) {
+					// ignore — fall through to empty default
+				}
+			}
+		}
+		return "";
+	}
+
+	public WorkspaceController getWorkspaceController() {
+		return myWorkspaceController;
+	}
+
+	public void newWorkspace() {
+		javax.swing.JFileChooser chooser = new javax.swing.JFileChooser(".");
+		chooser.setDialogTitle("Choose a folder for the new workspace");
+		chooser.setFileSelectionMode(javax.swing.JFileChooser.DIRECTORIES_ONLY);
+		chooser.setAcceptAllFileFilterUsed(false);
+		if (chooser.showOpenDialog(provideViewFrameIfItExists()) != javax.swing.JFileChooser.APPROVE_OPTION) return;
+
+		File folder = chooser.getSelectedFile();
+		myWorkspaceController.createWorkspace(folder, myOutboundConnectionList, myInboundConnectionList);
+		if (myView != null) myView.onWorkspaceChanged();
+	}
+
+	public void openWorkspace() {
+		javax.swing.JFileChooser chooser = new javax.swing.JFileChooser(".");
+		chooser.setDialogTitle("Open Workspace");
+		javax.swing.filechooser.FileNameExtensionFilter filter =
+			new javax.swing.filechooser.FileNameExtensionFilter("HAPI Workspace (*.hapi-workspace.xml)", "xml");
+		chooser.setFileFilter(filter);
+		if (chooser.showOpenDialog(provideViewFrameIfItExists()) != javax.swing.JFileChooser.APPROVE_OPTION) return;
+
+		File wsFile = chooser.getSelectedFile();
+		if (!myWorkspaceController.openWorkspace(wsFile)) {
+			showDialogError("Failed to open workspace file: " + wsFile.getName());
+			return;
+		}
+		restoreWorkspaceIntoView(wsFile);
+	}
+
+	private void restoreWorkspaceIntoView(File wsFile) {
+		if (!myWorkspaceController.hasWorkspace()) {
+			if (!myWorkspaceController.openWorkspace(wsFile)) return;
+		}
+
+		WorkspaceModel model = myWorkspaceController.getModel();
+
+		// Restore connections from workspace
+		if (model.getOutboundConnectionList() != null && !model.getOutboundConnectionList().isEmpty()) {
+			try {
+				myOutboundConnectionList = OutboundConnectionList.fromXml(this, model.getOutboundConnectionList());
+			} catch (Exception e) {
+				ourLog.error("Failed to restore outbound connections from workspace", e);
+			}
+		}
+		if (model.getInboundConnectionList() != null && !model.getInboundConnectionList().isEmpty()) {
+			try {
+				myInboundConnectionList = InboundConnectionList.fromXml(this, model.getInboundConnectionList());
+			} catch (Exception e) {
+				ourLog.error("Failed to restore inbound connections from workspace", e);
+			}
+		}
+
+		// Re-open files that were open last time
+		for (String filePath : model.getOpenFiles()) {
+			File f = new File(filePath);
+			if (f.exists()) {
+				openMessageFile(f, Prefs.getInstance().getOpenOrSaveCharset());
+			}
+		}
+
+		if (myView != null) {
+			myView.rebindConnectionLists();
+			myView.onWorkspaceChanged();
+			// Restore active file selection
+			if (model.getActiveFile() != null) {
+				for (Hl7V2MessageCollection msg : myMessagesList.getMessages()) {
+					if (model.getActiveFile().equals(msg.getSaveFileName())) {
+						setLeftSelectedItem(msg);
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	public void closeWorkspace() {
+		if (!myWorkspaceController.hasWorkspace()) return;
+
+		saveWorkspaceState();
+		myWorkspaceController.closeWorkspace();
+
+		// Stop and clear all connections
+		for (ca.uhn.hl7v2.testpanel.model.conn.OutboundConnection c : myOutboundConnectionList.getConnections()) {
+			c.stop();
+		}
+		for (ca.uhn.hl7v2.testpanel.model.conn.InboundConnection c : myInboundConnectionList.getConnections()) {
+			c.stop();
+		}
+		createDefaultOutboundConnectionList();
+		createDefaultInboundConnectionList();
+
+		// Close all open messages without prompting (already saved to workspace)
+		for (Hl7V2MessageCollection msg : new java.util.ArrayList<>(myMessagesList.getMessages())) {
+			myMessagesList.removeMessage(msg);
+		}
+
+		// Reset validation profiles and tables
+		myTableFileList = new TableFileList();
+		myProfileFileList = new ProfileFileList(myTableFileList);
+
+		setLeftSelectedItem(myNothingSelectedMarker);
+
+		if (myView != null) {
+			myView.rebindConnectionLists();
+			myView.onWorkspaceChanged();
+		}
+	}
+
+	private void saveWorkspaceState() {
+		if (!myWorkspaceController.hasWorkspace()) return;
+		String activePath = null;
+		if (myLeftSelectedItem instanceof Hl7V2MessageCollection) {
+			activePath = ((Hl7V2MessageCollection) myLeftSelectedItem).getSaveFileName();
+		}
+		myWorkspaceController.save(myOutboundConnectionList, myInboundConnectionList,
+			myMessagesList.getMessages(), activePath, myProfileFileList);
+	}
+
 	public void start() {
 		ourLog.info("Starting TestPanel Controller...");
 
@@ -912,9 +1089,19 @@ public class Controller {
 		}
 
 		new VersionChecker().start();
-		
+
 		Prefs.getInstance().setController(this);
-		
+
+		// Auto-load last workspace if it still exists
+		String lastWs = Prefs.getInstance().getLastWorkspacePath();
+		if (lastWs != null && !lastWs.isEmpty()) {
+			File wsFile = new File(lastWs);
+			if (wsFile.exists() && wsFile.isFile()) {
+				ourLog.info("Auto-loading last workspace: {}", wsFile);
+				restoreWorkspaceIntoView(wsFile);
+			}
+		}
+
 	}
 
 	public void startAllInboundConnections() {

@@ -207,6 +207,9 @@ public class Prefs {
 	@XmlElement(name = "window_position_y")
 	private Integer myWindowPositionY;
 
+	@XmlElement(name = "last_workspace_path")
+	private String myLastWorkspacePath;
+
 	/**
 	 * Non instantiable
 	 */
@@ -708,6 +711,15 @@ public class Prefs {
 
 		myWindowPositionH = theDimension.height;
 		myWindowPositionY = theDimension.width;
+		sync();
+	}
+
+	public String getLastWorkspacePath() {
+		return myLastWorkspacePath;
+	}
+
+	public void setLastWorkspacePath(String thePath) {
+		myLastWorkspacePath = thePath;
 		sync();
 	}
 

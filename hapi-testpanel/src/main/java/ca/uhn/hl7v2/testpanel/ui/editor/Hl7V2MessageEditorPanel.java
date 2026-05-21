@@ -128,7 +128,6 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 	}
 
 	private boolean myDontRespondToSourceMessageChanges;
-	private JPanel bottomPanel;
 	private JPanel messageEditorContainerPanel;
 	private JComboBox myShowCombo;
 	private Controller myController;
@@ -138,7 +137,6 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 	private JToggleButton myWrapToggle;
 	private FindDialog myFindDialog;
 	private ReplaceDialog myReplaceDialog;
-	private JLabel mylabel;
 	private JLabel mylabel_1;
 	private JLabel mylabel_2;
 	private JLabel mylabel_3;
@@ -487,33 +485,10 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		mySendingActivityTable.setController(myController);
 		// Note: mySendingActivityTable is added to the bottom connections tabs in TestPanelWindow
 
-		bottomPanel = new JPanel();
-		bottomPanel.setPreferredSize(new Dimension(10, 20));
-		bottomPanel.setMinimumSize(new Dimension(10, 20));
-		add(bottomPanel, BorderLayout.SOUTH);
-		GridBagLayout gbl_bottomPanel = new GridBagLayout();
-		gbl_bottomPanel.columnWidths = new int[] { 98, 74, 0 };
-		gbl_bottomPanel.rowHeights = new int[] { 16, 0 };
-		gbl_bottomPanel.columnWeights = new double[] { 0.0, 1.0, Double.MIN_VALUE };
-		gbl_bottomPanel.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
-		bottomPanel.setLayout(gbl_bottomPanel);
-
-		mylabel = new JLabel("Terser Path:");
-		mylabel.setHorizontalTextPosition(SwingConstants.LEFT);
-		mylabel.setHorizontalAlignment(SwingConstants.LEFT);
-		GridBagConstraints gbc_label = new GridBagConstraints();
-		gbc_label.fill = GridBagConstraints.VERTICAL;
-		gbc_label.weighty = 1.0;
-		gbc_label.anchor = GridBagConstraints.NORTHWEST;
-		gbc_label.gridx = 0;
-		gbc_label.gridy = 0;
-		bottomPanel.add(mylabel, gbc_label);
-
 		myTerserPathTextField = new JLabel();
 		myTerserPathTextField.setForeground(Color.BLUE);
-		myTerserPathTextField.setFont(new Font("Lucida Console", Font.PLAIN, 13));
+		myTerserPathTextField.setFont(new Font("Lucida Console", Font.PLAIN, 11));
 		myTerserPathTextField.setBorder(null);
-		myTerserPathTextField.setBackground(SystemColor.control);
 		myTerserPathTextField.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
@@ -522,13 +497,6 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 				}
 			}
 		});
-
-		GridBagConstraints gbc_TerserPathTextField = new GridBagConstraints();
-		gbc_TerserPathTextField.weightx = 1.0;
-		gbc_TerserPathTextField.fill = GridBagConstraints.HORIZONTAL;
-		gbc_TerserPathTextField.gridx = 1;
-		gbc_TerserPathTextField.gridy = 0;
-		bottomPanel.add(myTerserPathTextField, gbc_TerserPathTextField);
 
 		initLocal();
 
@@ -1145,6 +1113,10 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 	public ActivityTable getSendingActivityTable() {
 		return mySendingActivityTable;
+	}
+
+	public JLabel getTerserPathLabel() {
+		return myTerserPathTextField;
 	}
 
 	public void setTestPanelWindow(TestPanelWindow theWindow) {
