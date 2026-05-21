@@ -686,9 +686,43 @@ public class TestPanelWindow implements IDestroyable {
 
 	private void initializeMenuBar(JMenuBar menuBar) {
 		createFileMenu(menuBar);
+		createEditMenu(menuBar);
 		createToolsMenu(menuBar);
 		createConformanceMenu(menuBar);
 		createHelpMenu(menuBar);
+	}
+
+	private void createEditMenu(JMenuBar menuBar) {
+		JMenu editMenu = new JMenu("Edit");
+		editMenu.setMnemonic('e');
+		menuBar.add(editMenu);
+
+		JMenuItem findMenuItem = new JMenuItem("Find...");
+		findMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+		findMenuItem.addActionListener(e -> {
+			if (myMainPanel instanceof Hl7V2MessageEditorPanel) {
+				((Hl7V2MessageEditorPanel) myMainPanel).openFindDialog();
+			}
+		});
+		editMenu.add(findMenuItem);
+
+		JMenuItem replaceMenuItem = new JMenuItem("Replace...");
+		replaceMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_H, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+		replaceMenuItem.addActionListener(e -> {
+			if (myMainPanel instanceof Hl7V2MessageEditorPanel) {
+				((Hl7V2MessageEditorPanel) myMainPanel).openReplaceDialog();
+			}
+		});
+		editMenu.add(replaceMenuItem);
+
+		JMenuItem goToMenuItem = new JMenuItem("Go To Line...");
+		goToMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_G, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+		goToMenuItem.addActionListener(e -> {
+			if (myMainPanel instanceof Hl7V2MessageEditorPanel) {
+				((Hl7V2MessageEditorPanel) myMainPanel).openGoToDialog();
+			}
+		});
+		editMenu.add(goToMenuItem);
 	}
 
 	private void createFileMenu(JMenuBar menuBar) {

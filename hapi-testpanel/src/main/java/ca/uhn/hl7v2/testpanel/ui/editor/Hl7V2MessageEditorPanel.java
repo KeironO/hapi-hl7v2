@@ -54,16 +54,13 @@ import javax.swing.DefaultComboBoxModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
-import javax.swing.JEditorPane;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollBar;
-import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTabbedPane;
 import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
 import javax.swing.SwingConstants;
@@ -74,9 +71,23 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.Highlighter;
 
+import org.fife.ui.rsyntaxtextarea.AbstractTokenMakerFactory;
+import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
+import org.fife.ui.rsyntaxtextarea.SyntaxConstants;
+import org.fife.ui.rsyntaxtextarea.TokenMakerFactory;
+import org.fife.ui.rtextarea.RTextScrollPane;
+import org.fife.rsta.ui.search.FindDialog;
+import org.fife.rsta.ui.search.ReplaceDialog;
+import org.fife.rsta.ui.GoToDialog;
+import org.fife.rsta.ui.search.SearchEvent;
+import org.fife.rsta.ui.search.SearchListener;
+import org.fife.ui.rtextarea.SearchContext;
+import org.fife.ui.rtextarea.SearchEngine;
+import org.fife.ui.rtextarea.SearchResult;
+
 import ca.uhn.hl7v2.model.Message;
 import ca.uhn.hl7v2.testpanel.model.msg.AbstractMessage;
-import jsyntaxpane.DefaultSyntaxKit;
+import ca.uhn.hl7v2.testpanel.ui.Er7TokenMaker;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.Validate;
@@ -93,7 +104,6 @@ import ca.uhn.hl7v2.testpanel.model.conn.OutboundConnectionList;
 import ca.uhn.hl7v2.testpanel.model.msg.Hl7V2MessageCollection;
 import ca.uhn.hl7v2.testpanel.ui.ActivityTable;
 import ca.uhn.hl7v2.testpanel.ui.BaseMainPanel;
-import ca.uhn.hl7v2.testpanel.ui.Er7SyntaxKit;
 import ca.uhn.hl7v2.testpanel.ui.HoverButtonMouseAdapter;
 import ca.uhn.hl7v2.testpanel.ui.IDestroyable;
 import ca.uhn.hl7v2.testpanel.ui.ShowEnum;
@@ -105,23 +115,16 @@ import ca.uhn.hl7v2.testpanel.util.Range;
 import ca.uhn.hl7v2.testpanel.xsd.Hl7V2EncodingTypeEnum;
 import ca.uhn.hl7v2.validation.impl.DefaultValidation;
 
-public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyable {
+public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyable, SearchListener {
 	private static final String CREATE_NEW_CONNECTION = "Create New Connection...";
 	private static final String NO_CONNECTIONS = "No Connections";
 	private static final Logger ourLog = LoggerFactory.getLogger(Hl7V2MessageEditorPanel.class);
 
+	private static final String SYNTAX_STYLE_ER7 = "text/er7";
+
 	static {
-
-		System.setProperty("DefaultFont", "ARIAL-PLAIN-13");
-
-		try {
-			DefaultSyntaxKit.initKit();
-			DefaultSyntaxKit.registerContentType("text/er7", Er7SyntaxKit.class.getName());
-			ourLog.info("Registered syntaxKit");
-		} catch (Throwable e) {
-			e.printStackTrace();
-		}
-
+		AbstractTokenMakerFactory factory = (AbstractTokenMakerFactory) TokenMakerFactory.getDefaultInstance();
+		factory.putMapping(SYNTAX_STYLE_ER7, Er7TokenMaker.class.getName());
 	}
 
 	private boolean myDontRespondToSourceMessageChanges;
@@ -132,14 +135,17 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 	private boolean myDisableCaretUpdateHandling;
 	private DocumentListener myDocumentListener;
 	private JToggleButton myFollowToggle;
+	private JToggleButton myWrapToggle;
+	private FindDialog myFindDialog;
+	private ReplaceDialog myReplaceDialog;
 	private JLabel mylabel;
 	private JLabel mylabel_1;
 	private JLabel mylabel_2;
 	private JLabel mylabel_3;
 	private Hl7V2MessageCollection myMessage;
-	private JEditorPane myMessageEditor;
+	private RSyntaxTextArea myMessageEditor;
 	private PropertyChangeListener myMessageListeneer;
-	private JScrollPane myMessageScrollPane;
+	private RTextScrollPane myMessageScrollPane;
 	private PropertyChangeListener myOutboundConnectionsListener;
 	private JComboBox myOutboundInterfaceCombo;
 	private DefaultComboBoxModel myOutboundInterfaceComboModel;
@@ -215,13 +221,13 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		mysplitPane.setRightComponent(messageEditorContainerPanel);
 		messageEditorContainerPanel.setLayout(new BorderLayout(0, 0));
 
-		myMessageEditor = new JEditorPane();
-		Highlighter h = new UnderlineHighlighter();
-		myMessageEditor.setHighlighter(h);
-		// myMessageEditor.setFont(Prefs.getHl7EditorFont());
+		myMessageEditor = new RSyntaxTextArea();
+		myMessageEditor.setSyntaxEditingStyle(SYNTAX_STYLE_ER7);
+		myMessageEditor.setCodeFoldingEnabled(false);
+		myMessageEditor.setLineWrap(false);
+		myMessageEditor.setHighlightCurrentLine(false);
 		myMessageEditor.setSelectedTextColor(Color.black);
-
-		myMessageEditor.setCaret(new EditorCaret());
+		myMessageEditor.setFont(resolveEditorFont(14));
 
 		myMessageEditor.addCaretListener(new javax.swing.event.CaretListener() {
 			public void caretUpdate(javax.swing.event.CaretEvent e) {
@@ -231,7 +237,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 			}
 		});
 
-		myMessageScrollPane = new JScrollPane(myMessageEditor);
+		myMessageScrollPane = new RTextScrollPane(myMessageEditor, true);
 		messageEditorContainerPanel.add(myMessageScrollPane);
 
 		JToolBar toolBar = new JToolBar();
@@ -250,6 +256,16 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		myFollowToggle.setIcon(new ImageIcon(Hl7V2MessageEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/updown.png")));
 		myFollowToggle.setSelected(theController.isMessageEditorInFollowMode());
 		toolBar.add(myFollowToggle);
+
+		myWrapToggle = new JToggleButton("Wrap");
+		myWrapToggle.setToolTipText("Toggle line wrapping in the message editor");
+		myWrapToggle.setSelected(false);
+		myWrapToggle.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				myMessageEditor.setLineWrap(myWrapToggle.isSelected());
+			}
+		});
+		toolBar.add(myWrapToggle);
 
 		myhorizontalStrut = Box.createHorizontalStrut(20);
 		toolBar.add(myhorizontalStrut);
@@ -956,9 +972,9 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		String sourceMessage = myMessage.getSourceMessage();
 
 		if (myMessage.getEncoding() == Hl7V2EncodingTypeEnum.XML) {
-			myMessageEditor.setContentType("text/xml");
+			myMessageEditor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_XML);
 		} else {
-			myMessageEditor.setContentType("text/er7");
+			myMessageEditor.setSyntaxEditingStyle(SYNTAX_STYLE_ER7);
 			sourceMessage = sourceMessage.replace('\r', '\n');
 		}
 
@@ -970,7 +986,6 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 		SwingUtilities.invokeLater(new Runnable() {
 			public void run() {
-				// myMessageEditor.setFont(Prefs.getHl7EditorFont());
 				vsb.setValue(verticalValue);
 			}
 		});
@@ -1128,6 +1143,87 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 	public void setTestPanelWindow(TestPanelWindow theWindow) {
 		myTestPanelWindow = theWindow;
+	}
+
+	public void openFindDialog() {
+		if (myReplaceDialog != null && myReplaceDialog.isVisible()) {
+			myReplaceDialog.setVisible(false);
+		}
+		if (myFindDialog == null) {
+			myFindDialog = new FindDialog((java.awt.Frame) SwingUtilities.getWindowAncestor(this), this);
+		}
+		myFindDialog.setVisible(true);
+	}
+
+	public void openReplaceDialog() {
+		if (myFindDialog != null && myFindDialog.isVisible()) {
+			myFindDialog.setVisible(false);
+		}
+		if (myReplaceDialog == null) {
+			myReplaceDialog = new ReplaceDialog((java.awt.Frame) SwingUtilities.getWindowAncestor(this), this);
+		}
+		myReplaceDialog.setVisible(true);
+	}
+
+	public void openGoToDialog() {
+		GoToDialog dialog = new GoToDialog((java.awt.Frame) SwingUtilities.getWindowAncestor(this));
+		dialog.setMaxLineNumberAllowed(myMessageEditor.getLineCount());
+		dialog.setVisible(true);
+		int line = dialog.getLineNumber();
+		if (line > 0) {
+			try {
+				myMessageEditor.setCaretPosition(myMessageEditor.getLineStartOffset(line - 1));
+			} catch (javax.swing.text.BadLocationException e) {
+				// ignore
+			}
+		}
+	}
+
+	@Override
+	public void searchEvent(SearchEvent e) {
+		SearchEvent.Type type = e.getType();
+		SearchContext context = e.getSearchContext();
+		SearchResult result;
+		switch (type) {
+			case MARK_ALL:
+				result = SearchEngine.markAll(myMessageEditor, context);
+				break;
+			case FIND:
+				result = SearchEngine.find(myMessageEditor, context);
+				if (!result.wasFound()) {
+					javax.swing.UIManager.getLookAndFeel().provideErrorFeedback(myMessageEditor);
+				}
+				break;
+			case REPLACE:
+				result = SearchEngine.replace(myMessageEditor, context);
+				if (!result.wasFound()) {
+					javax.swing.UIManager.getLookAndFeel().provideErrorFeedback(myMessageEditor);
+				}
+				break;
+			case REPLACE_ALL:
+				result = SearchEngine.replaceAll(myMessageEditor, context);
+				javax.swing.JOptionPane.showMessageDialog(this, result.getCount() + " replacements made.");
+				break;
+			default:
+				break;
+		}
+	}
+
+	@Override
+	public String getSelectedText() {
+		return myMessageEditor.getSelectedText();
+	}
+
+	private static Font resolveEditorFont(int size) {
+		String[] preferred = { "JetBrains Mono", "Fira Code", "Cascadia Code" };
+		java.awt.GraphicsEnvironment ge = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment();
+		java.util.Set<String> available = new java.util.HashSet<>(java.util.Arrays.asList(ge.getAvailableFontFamilyNames()));
+		for (String name : preferred) {
+			if (available.contains(name)) {
+				return new Font(name, Font.PLAIN, size);
+			}
+		}
+		return new Font(Font.MONOSPACED, Font.PLAIN, size);
 	}
 
 }

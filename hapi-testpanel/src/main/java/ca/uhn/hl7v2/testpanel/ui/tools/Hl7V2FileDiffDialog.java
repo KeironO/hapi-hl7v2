@@ -16,21 +16,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
-import javax.swing.DefaultListCellRenderer;
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JDialog;
-import javax.swing.JEditorPane;
-import javax.swing.JFileChooser;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JProgressBar;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JTextArea;
+import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.event.ChangeEvent;
@@ -39,15 +25,13 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Highlighter;
 
-import jsyntaxpane.DefaultSyntaxKit;
-
 import org.apache.commons.lang.StringUtils;
+import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
+import org.fife.ui.rtextarea.RTextScrollPane;
 
 import ca.uhn.hl7v2.testpanel.controller.Hl7V2FileDiffController;
 import ca.uhn.hl7v2.testpanel.controller.Prefs;
-import ca.uhn.hl7v2.testpanel.ui.Er7SyntaxKit;
-import ca.uhn.hl7v2.testpanel.ui.editor.EditorCaret;
-import ca.uhn.hl7v2.testpanel.ui.editor.UnderlineHighlighter;
+import ca.uhn.hl7v2.testpanel.ui.Er7TokenMaker;
 import ca.uhn.hl7v2.testpanel.util.SimpleDocumentListener;
 
 import java.lang.reflect.InvocationTargetException;
@@ -56,10 +40,12 @@ public class Hl7V2FileDiffDialog extends JDialog {
 
 	private static final long serialVersionUID = 1L;
 
+	private static final String SYNTAX_STYLE_ER7 = "text/er7";
+
 	private JButton myBeginButton;
 	private Hl7V2FileDiffController myController;
-	private JEditorPane myPane1TextArea;
-	private JEditorPane myPane2TextArea;
+	private RSyntaxTextArea myPane1TextArea;
+	private RSyntaxTextArea myPane2TextArea;
 	private JButton myStopButton;
 	private JCheckBox myStopOnFirstErrorCheck;
 	private JProgressBar myProgressBar;
@@ -69,12 +55,10 @@ public class Hl7V2FileDiffDialog extends JDialog {
 	private JDialog myLogWindow;
 
 	static {
-		try {
-			DefaultSyntaxKit.initKit();
-			DefaultSyntaxKit.registerContentType("text/er7", Er7SyntaxKit.class.getName());
-		} catch (Throwable e) {
-			e.printStackTrace();
-		}
+		org.fife.ui.rsyntaxtextarea.AbstractTokenMakerFactory factory =
+			(org.fife.ui.rsyntaxtextarea.AbstractTokenMakerFactory)
+				org.fife.ui.rsyntaxtextarea.TokenMakerFactory.getDefaultInstance();
+		factory.putMapping(SYNTAX_STYLE_ER7, Er7TokenMaker.class.getName());
 	}
 
 	public Hl7V2FileDiffDialog(Hl7V2FileDiffController theHl7v2FileDiffController) {
@@ -133,27 +117,21 @@ public class Hl7V2FileDiffDialog extends JDialog {
 		panel.setBorder(new TitledBorder(null, title, TitledBorder.LEADING, TitledBorder.TOP, null, null));
 		panel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-		JEditorPane editorPane;
-		if (paneIndex == 0) {
-			myPane1TextArea = new JEditorPane();
-			editorPane = myPane1TextArea;
-		} else {
-			myPane2TextArea = new JEditorPane();
-			editorPane = myPane2TextArea;
-		}
-
+		RSyntaxTextArea editorPane = new RSyntaxTextArea();
+		editorPane.setSyntaxEditingStyle(SYNTAX_STYLE_ER7);
+		editorPane.setCodeFoldingEnabled(false);
+		editorPane.setLineWrap(false);
+		editorPane.setHighlightCurrentLine(false);
 		editorPane.setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 12));
 
-		JScrollPane scrollPane = new JScrollPane(editorPane);
+		if (paneIndex == 0) {
+			myPane1TextArea = editorPane;
+		} else {
+			myPane2TextArea = editorPane;
+		}
 
-		// Set content type BEFORE adding listeners so JSyntaxPane can install its components
-		editorPane.setContentType("text/er7");
+		RTextScrollPane scrollPane = new RTextScrollPane(editorPane, false);
 
-		Highlighter h = new UnderlineHighlighter();
-		editorPane.setHighlighter(h);
-		editorPane.setCaret(new EditorCaret());
-
-		// Add document listener AFTER content type is set, so it doesn't get lost
 		editorPane.getDocument().addDocumentListener(new SimpleDocumentListener() {
 			@Override
 			public void update(DocumentEvent theE) {
@@ -177,7 +155,7 @@ public class Hl7V2FileDiffDialog extends JDialog {
 		return panel;
 	}
 
-	private void loadFileIntoTextArea(JEditorPane editorPane) {
+	private void loadFileIntoTextArea(RSyntaxTextArea editorPane) {
 		File currentDir = Prefs.getTestpanelHomeDirectory();
 		JFileChooser chooser = new JFileChooser(currentDir);
 		int result = chooser.showOpenDialog(Hl7V2FileDiffDialog.this);
@@ -376,7 +354,7 @@ public class Hl7V2FileDiffDialog extends JDialog {
 		myBeginButton.setEnabled(canBegin);
 	}
 
-	private String getEditorPaneText(JEditorPane pane) {
+	private String getEditorPaneText(RSyntaxTextArea pane) {
 		if (pane == null) {
 			return "";
 		}

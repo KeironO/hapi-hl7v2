@@ -25,74 +25,94 @@
  */
 package ca.uhn.hl7v2.testpanel.util;
 
-import java.io.IOException;
-import java.io.StringReader;
-
-import jsyntaxpane.Token;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import testpanel.Er7Lexer;
-
 public class FormatUtil {
 
-	private static final Logger ourLog = LoggerFactory.getLogger(FormatUtil.class);
-	
+	private static final String COLOR_KEYWORD  = "#3333EE"; // segment names
+	private static final String COLOR_DELIM    = "#A0A0A0"; // delimiters
+	private static final String COLOR_NUMBER   = "#990033"; // numbers
+	private static final String COLOR_ESCAPE   = "#00A000"; // escape sequences
+
 	public static String formatEr7(String theEr7, boolean theIsType) {
 		StringBuilder b = new StringBuilder();
 		b.append("<html>");
 
-		Er7Lexer lexer = new Er7Lexer(new StringReader(theEr7));
+		char[] chars = theEr7.toCharArray();
+		int i = 0;
+		boolean atLineStart = !theIsType;
 
-		if (theIsType) {
-			lexer.yybegin(Er7Lexer.AT_START_OF_VALUE);
-		}
-		
-		Token next;
-		do {
-			try {
-				next = lexer.yylex();
-			} catch (IOException e) {
-				ourLog.error("Failed to parse", e);
-				break;
+		while (i < chars.length) {
+			char c = chars[i];
+
+			// Newline — reset to line-start state
+			if (c == '\r' || c == '\n') {
+				b.append("<br>");
+				i++;
+				atLineStart = true;
+				continue;
 			}
 
-			if (next != null) {
-				switch (next.type) {
-				case KEYWORD:
-				case KEYWORD2:
-					b.append("<span style=\"color: #3333EE;\">");
-					b.append(theEr7, next.start, next.end());
+			// Segment name at start of line: 3 letter/digit chars followed by | or end
+			if (atLineStart && i + 2 < chars.length
+					&& Character.isLetter(c)
+					&& Character.isLetterOrDigit(chars[i + 1])
+					&& Character.isLetterOrDigit(chars[i + 2])) {
+				int after = i + 3;
+				if (after >= chars.length || chars[after] == '|' || chars[after] == '\r' || chars[after] == '\n') {
+					b.append("<span style=\"color: ").append(COLOR_KEYWORD).append(";\">");
+					b.append(chars, i, 3);
 					b.append("</span>");
-					break;
-				case TYPE:
-					b.append("<span style=\"color: #A0A0A0;\">");
-					b.append(theEr7, next.start, next.end());
-					b.append("</span>");
-					break;
-				case TYPE2:
-					b.append("<span style=\"color: #990033;\">");
-					b.append(theEr7, next.start, next.end());
-					b.append("</span>");
-					break;
-				case TYPE3:
-					b.append("<span style=\"color: #00A000;\">");
-					b.append(theEr7, next.start, next.end());
-					b.append("</span>");
-					break;
-				default:
-					b.append(theEr7, next.start, next.end());
-					break;
+					i += 3;
+					atLineStart = false;
+					continue;
 				}
 			}
+			atLineStart = false;
 
-		} while (next != null);
+			// Delimiter
+			if (c == '|' || c == '^' || c == '&' || c == '~') {
+				b.append("<span style=\"color: ").append(COLOR_DELIM).append(";\">");
+				b.append(c);
+				b.append("</span>");
+				i++;
+				continue;
+			}
+
+			// Escape sequence \...\
+			if (c == '\\') {
+				int escEnd = i + 1;
+				while (escEnd < chars.length && chars[escEnd] != '\\') {
+					escEnd++;
+				}
+				if (escEnd < chars.length) {
+					escEnd++; // include closing backslash
+				}
+				b.append("<span style=\"color: ").append(COLOR_ESCAPE).append(";\">");
+				b.append(theEr7, i, escEnd);
+				b.append("</span>");
+				i = escEnd;
+				continue;
+			}
+
+			// Number: leading digit or '-' followed by digits/dots until a delimiter or end
+			if (Character.isDigit(c) || (c == '-' && i + 1 < chars.length && Character.isDigit(chars[i + 1]))) {
+				int numEnd = i;
+				while (numEnd < chars.length && (Character.isDigit(chars[numEnd]) || chars[numEnd] == '.' || chars[numEnd] == '-')) {
+					numEnd++;
+				}
+				b.append("<span style=\"color: ").append(COLOR_NUMBER).append(";\">");
+				b.append(theEr7, i, numEnd);
+				b.append("</span>");
+				i = numEnd;
+				continue;
+			}
+
+			// Plain text
+			b.append(c);
+			i++;
+		}
 
 		b.append("</html>");
-		String html = b.toString().replace("\r", "<br>");
-		
-		return html;
+		return b.toString();
 	}
-	
+
 }

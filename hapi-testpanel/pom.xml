@@ -15,26 +15,12 @@
 			<name>NetBeans Platform Maven Repository</name>
 			<url>http://bits.netbeans.org/maven2/</url>
 		</repository>
-		<!-- For JSyntaxPane -->
-		<repository>
-			<id>hapi</id>
-			<name>HAPI Maven Repository</name>
-			<url>http://hl7api.sourceforge.net/m2</url>
-		</repository>
 		<!-- For Apple Java Extensions -->
 		<repository>
 			<id>ooo-maven-repo</id>
 			<url>http://ooo-maven.googlecode.com/hg/repository</url>
 		</repository>
 	</repositories>
-	<pluginRepositories>
-		<pluginRepository>
-			<id>jflex</id>
-			<name>JFlex repository</name>
-			<url>http://jflex.sourceforge.net/repo/</url>
-		</pluginRepository>
-		<!-- <pluginRepository> <id>launch4j-xml-plugin-repo</id> <name>launch4j-xml-plugin Repository for Maven</name> <url>https://launch4j-xml-plugin.googlecode.com/svn/repo</url> </pluginRepository> -->
-	</pluginRepositories>
 	<dependencies>
 		<dependency>
 			<groupId>org.mockito</groupId>
@@ -60,11 +46,15 @@
 			<classifier>sources</classifier>
 			<scope>provided</scope>
 		</dependency>
-		<!-- We're using a customized version of JSyntaxPane. See http://code.google.com/p/jsyntaxpane/issues/detail?id=180 -->
 		<dependency>
-			<groupId>de.sciss</groupId>
-			<artifactId>jsyntaxpane</artifactId>
-			<version>1.0.0</version>
+			<groupId>com.fifesoft</groupId>
+			<artifactId>rsyntaxtextarea</artifactId>
+			<version>3.4.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.fifesoft</groupId>
+			<artifactId>rstaui</artifactId>
+			<version>3.3.0</version>
 		</dependency>
 
 		<dependency>
@@ -215,18 +205,6 @@
 								<source>src/main/xsd</source>
 							</sources>
 						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>de.jflex</groupId>
-				<artifactId>jflex-maven-plugin</artifactId>
-				<version>1.9.1</version>
-				<executions>
-					<execution>
-						<goals>
-							<goal>generate</goal>
-						</goals>
 					</execution>
 				</executions>
 			</plugin>
