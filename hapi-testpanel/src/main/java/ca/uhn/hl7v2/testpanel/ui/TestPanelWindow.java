@@ -688,7 +688,6 @@ public class TestPanelWindow implements IDestroyable {
 		createFileMenu(menuBar);
 		createEditMenu(menuBar);
 		createToolsMenu(menuBar);
-		createConformanceMenu(menuBar);
 		createHelpMenu(menuBar);
 	}
 
@@ -788,19 +787,19 @@ public class TestPanelWindow implements IDestroyable {
 
 		toolsMenu.addSeparator();
 
+		JMenu conformanceSubMenu = new JMenu("Conformance");
+		profilesAndTablesMenuItem = new JMenuItem("Profiles and Tables...");
+		profilesAndTablesMenuItem.addActionListener(e -> myController.showProfilesAndTablesEditor());
+		conformanceSubMenu.add(profilesAndTablesMenuItem);
+		toolsMenu.add(conformanceSubMenu);
+
+		toolsMenu.addSeparator();
+
 		populateSampleMenuItem = new JMenuItem("Populate TestPanel with Sample Message and Connections...");
 		populateSampleMenuItem.addActionListener(e -> myController.populateWithSampleMessageAndConnections());
 		toolsMenu.add(populateSampleMenuItem);
 	}
 
-	private void createConformanceMenu(JMenuBar menuBar) {
-		conformanceMenu = new JMenu("Conformance");
-		menuBar.add(conformanceMenu);
-
-		profilesAndTablesMenuItem = new JMenuItem("Profiles and Tables...");
-		profilesAndTablesMenuItem.addActionListener(e -> myController.showProfilesAndTablesEditor());
-		conformanceMenu.add(profilesAndTablesMenuItem);
-	}
 
 	private void createHelpMenu(JMenuBar menuBar) {
 		helpMenu = new JMenu("Help");
@@ -1091,7 +1090,6 @@ public class TestPanelWindow implements IDestroyable {
 	private JMenu helpMenu;
 	private JMenuItem aboutMenuItem;
 	private JMenuItem populateSampleMenuItem;
-	private JMenu conformanceMenu;
 	private JMenuItem profilesAndTablesMenuItem;
 	private JMenu myRecentFilesMenu;
 	private JMenuItem openMenuItem;

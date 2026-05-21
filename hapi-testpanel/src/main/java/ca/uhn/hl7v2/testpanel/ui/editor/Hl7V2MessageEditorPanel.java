@@ -226,7 +226,8 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		myMessageEditor.setCodeFoldingEnabled(false);
 		myMessageEditor.setLineWrap(false);
 		myMessageEditor.setHighlightCurrentLine(false);
-		myMessageEditor.setSelectedTextColor(Color.black);
+		myMessageEditor.setSelectionColor(new Color(100, 150, 255, 150));
+		myMessageEditor.setSelectedTextColor(null);
 		myMessageEditor.setFont(resolveEditorFont(14));
 
 		myMessageEditor.addCaretListener(new javax.swing.event.CaretListener() {
@@ -259,6 +260,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 		myWrapToggle = new JToggleButton("Wrap");
 		myWrapToggle.setToolTipText("Toggle line wrapping in the message editor");
+		myWrapToggle.setIcon(new ImageIcon(Hl7V2MessageEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/wrap.png")));
 		myWrapToggle.setSelected(false);
 		myWrapToggle.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -333,9 +335,11 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 		mytoolBar_1 = new JToolBar();
 		mytoolBar_1.setFloatable(false);
+		mytoolBar_1.setBorder(javax.swing.BorderFactory.createEmptyBorder(3, 4, 3, 4));
 		treeContainer.add(mytoolBar_1, BorderLayout.NORTH);
 
 		mylabel_3 = new JLabel("Show");
+		mylabel_3.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 2, 0, 6));
 		mytoolBar_1.add(mylabel_3);
 
 		myShowCombo = new JComboBox();
@@ -343,6 +347,8 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		myShowCombo.setPreferredSize(new Dimension(130, 27));
 		myShowCombo.setMinimumSize(new Dimension(130, 27));
 		myShowCombo.setMaximumSize(new Dimension(130, 32767));
+
+		mytoolBar_1.add(Box.createHorizontalStrut(6));
 
 		collapseAllButton = new JButton();
 		collapseAllButton.setBorderPainted(false);
@@ -805,7 +811,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 				removeHighlights();
 				try {
 					Highlighter hilite = myMessageEditor.getHighlighter();
-					hilite.addHighlight(range.getStart(), range.getEnd(), new javax.swing.text.DefaultHighlighter.DefaultHighlightPainter(new Color(200, 220, 255)));
+					hilite.addHighlight(range.getStart(), range.getEnd(), new javax.swing.text.DefaultHighlighter.DefaultHighlightPainter(new Color(255, 200, 50, 100)));
 				} catch (javax.swing.text.BadLocationException e) {
 					ourLog.error("Failed to highlight range", e);
 				}
@@ -910,7 +916,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		// Add new highlight
 		try {
 			Highlighter hilite = myMessageEditor.getHighlighter();
-			hilite.addHighlight(fieldStart, fieldEnd, new javax.swing.text.DefaultHighlighter.DefaultHighlightPainter(new Color(200, 220, 255)));
+			hilite.addHighlight(fieldStart, fieldEnd, new javax.swing.text.DefaultHighlighter.DefaultHighlightPainter(new Color(255, 200, 50, 100)));
 		} catch (javax.swing.text.BadLocationException e) {
 			ourLog.error("Failed to highlight field at cursor", e);
 		}
