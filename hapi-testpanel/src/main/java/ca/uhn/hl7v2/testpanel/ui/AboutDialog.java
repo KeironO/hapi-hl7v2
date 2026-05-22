@@ -113,7 +113,7 @@ public class AboutDialog extends JDialog {
 			gbl_panel.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, Double.MIN_VALUE };
 			panel.setLayout(gbl_panel);
 
-			JLabel lblNewLabel = new JLabel("Welcome to the HAPI TestPanel. ");
+			JLabel lblNewLabel = new JLabel("Welcome to HAPI TestPanelNg. ");
 			lblNewLabel.setHorizontalAlignment(SwingConstants.CENTER);
 			GridBagConstraints gbc_lblNewLabel = new GridBagConstraints();
 			gbc_lblNewLabel.gridwidth = 2;
@@ -125,7 +125,7 @@ public class AboutDialog extends JDialog {
 			panel.add(lblNewLabel, gbc_lblNewLabel);
 			{
 				JLabel lblThisSoftwareIs = new JLabel(
-						"<html><center>This is free software, licensed under the terms of the GNU General Public License (Version 2) and the Mozilla Public License (Version 1.0).</center></html>");
+						"<html><center>A heavily modified fork of the original HAPI TestPanel that adds a load of functionality. This is free software, licensed under the terms of the GNU General Public License (Version 2) and the Mozilla Public License (Version 1.0).</center></html>");
 				lblThisSoftwareIs.setHorizontalAlignment(SwingConstants.CENTER);
 				GridBagConstraints gbc_lblThisSoftwareIs = new GridBagConstraints();
 				gbc_lblThisSoftwareIs.gridwidth = 2;

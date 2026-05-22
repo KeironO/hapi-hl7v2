@@ -221,9 +221,9 @@ public class TestPanelWindow implements IDestroyable {
 	private void updateWindowTitle() {
 		String title = myMainPanel != null ? myMainPanel.getWindowTitle() : null;
 		if (StringUtils.isNotBlank(title)) {
-			myframe.setTitle("HAPI TestPanel " + myController.getAppVersionString() + " - " + title);
+			myframe.setTitle("HAPI TestPanelNg " + myController.getAppVersionString() + " - " + title);
 		} else {
-			myframe.setTitle("HAPI TestPanel " + myController.getAppVersionString());
+			myframe.setTitle("HAPI TestPanelNg " + myController.getAppVersionString());
 		}
 	}
 
@@ -319,7 +319,7 @@ public class TestPanelWindow implements IDestroyable {
 		l.add(Toolkit.getDefaultToolkit().getImage(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/hapi_64.png")));
 		
 		myframe.setIconImages(l);
-		myframe.setTitle("HAPI TestPanel");
+		myframe.setTitle("HAPI TestPanelNg");
 		myframe.setBounds(100, 100, 796, 603);
 		myframe.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 		myframe.addWindowListener(new WindowAdapter() {
