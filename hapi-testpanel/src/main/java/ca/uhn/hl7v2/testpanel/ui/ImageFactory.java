@@ -46,6 +46,10 @@ public class ImageFactory {
 
 	private static Map<String, ImageIcon> ourIcons = new HashMap<String, ImageIcon>();
 
+	public static void clearCache() {
+		ourIcons.clear();
+	}
+
 	// ~ Methods
 	// --------------------------------------------------------------------------------------------------------
 
@@ -75,7 +79,6 @@ public class ImageFactory {
 
 	private static ImageIcon getImageIcon(String theLocation) {
 		ImageIcon retVal = ourIcons.get(theLocation);
-
 		if (retVal == null) {
 			URL resource = ImageFactory.class.getClassLoader().getResource(theLocation);
 			if (resource == null) {
@@ -84,7 +87,6 @@ public class ImageFactory {
 			retVal = new ImageIcon(resource);
 			ourIcons.put(theLocation, retVal);
 		}
-
 		return retVal;
 	}
 

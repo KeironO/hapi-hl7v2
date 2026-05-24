@@ -1731,27 +1731,19 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 	}
 
 	private class Hl7TreeCellRenderer extends DefaultTreeCellRenderer {
+
 		@Override
 		public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean expanded,
 				boolean leaf, int row, boolean hasFocus) {
 			super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus);
+
 			if (value instanceof TreeNodeMessage) {
 				TreeNodeMessage tnm = (TreeNodeMessage) value;
-				String text = tnm.getMessage().getMessageDescription();
-				if (selected) {
-					text = "<html><font color=\"white\">" + text + "</font></html>";
-				} else {
-					text = "<html>" + text + "</html>";
-				}
-				setText(text);
+				setText(tnm.getMessage().getMessageDescription());
 				setIcon(ImageFactory.getTreeBundle());
 			} else if (value instanceof TreeNodeBase) {
 				TreeNodeBase node = (TreeNodeBase) value;
-				String nodeText = node.getNodeText().toString();
-				if (selected) {
-					nodeText = nodeText.replaceAll("color=\"[^\"]*\"", "color=\"white\"");
-				}
-				setText("<html>" + nodeText + "</html>");
+				setText("<html>" + node.getNodeText().toString() + "</html>");
 				if (node instanceof TreeNodeGroup) {
 					setIcon(ImageFactory.getTreeBundle());
 				} else if (node instanceof TreeNodeSegment) {
@@ -1763,11 +1755,6 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 				}
 			}
 
-			if (selected) {
-				setForeground(Color.WHITE);
-			} else {
-				setForeground(Color.BLACK);
-			}
 			return this;
 		}
 	}
@@ -1819,7 +1806,6 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 	}
 
 	public abstract class TreeNodeBase extends DefaultMutableTreeNode {
-		protected static final String COLOR_REPNUM = "#808000";
 
 		private Boolean myContainError;
 		private String myErrorDescription;
@@ -1978,33 +1964,36 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		public StringBuilder getNodeText() {
 			StringBuilder b = new StringBuilder();
 
-			b.append("<font color=\"" + getNodeTextColor() + "\">");
+			if (isNameBold()) {
+				b.append("<b>");
+			}
 			b.append(myName);
-			b.append("</font>");
+			if (isNameBold()) {
+				b.append("</b>");
+			}
 
 			if (myRepeating != null && myRepeating && (myShowRep0 || getRepNum() > 0)) {
-				b.append("<font color=\"" + COLOR_REPNUM + "\">");
+				b.append("<i>");
 				b.append(" (rep");
 				if (myRepNum > 0) {
 					b.append(' ');
 					b.append(myRepNum + 1);
 				}
 				b.append(")");
-				b.append("</font>");
+				b.append("</i>");
 			}
 
 			if (StringUtils.isNotBlank(getDisplayName())) {
-				b.append("<font color=\"#00A000\">");
-				b.append(" - ");
+				b.append("<i> - ");
 				b.append(getDisplayName());
-				b.append("</font>");
+				b.append("</i>");
 			}
 
 			return b;
 		}
 
-		public String getNodeTextColor() {
-			return "#000000";
+		public boolean isNameBold() {
+			return false;
 		}
 
 		public String getPipeEncodedValue() {
@@ -2166,9 +2155,7 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		@Override
 		public StringBuilder getNodeText() {
 			StringBuilder retVal = new StringBuilder();
-			retVal.append("<html><font color=\"#00FF00\">");
 			retVal.append(myMessage.getSourceMessage());
-			retVal.append("</font></html>");
 			return retVal;
 		}
 
@@ -2247,8 +2234,8 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		}
 
 		@Override
-		public String getNodeTextColor() {
-			return "#404000";
+		public boolean isNameBold() {
+			return true;
 		}
 
 		public List<Segment> getSegments() throws HL7Exception {
@@ -2643,17 +2630,15 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 			StringBuilder retVal = super.getNodeText();
 
 			if (isNonStandard()) {
-				retVal.append("<font color=\"#A0A000\">");
-				retVal.append(" (non standard)");
-				retVal.append("</font>");
+				retVal.append("<i> (non standard)</i>");
 			}
 
 			return retVal;
 		}
 
 		@Override
-		public String getNodeTextColor() {
-			return "#006000";
+		public boolean isNameBold() {
+			return true;
 		}
 
 		/**
@@ -2771,26 +2756,24 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 			b.append(myParentName);
 
 			if (isRepeating() && (myShowRep0 || getRepNum() > 0)) {
-				b.append("<font color=\"" + COLOR_REPNUM + "\">");
+				b.append("<i>");
 				b.append(" (rep");
 				if (getRepNum() > 0) {
 					b.append(' ');
 					b.append(getRepNum() + 1);
 				}
 				b.append(")");
-				b.append("</font>");
+				b.append("</i>");
 			}
 
-			b.append("<font color=\"#00A000\">");
+			b.append("<i>");
 
-			// Try to get component name from display name
 			String displayName = getDisplayName();
 			if (StringUtils.isNotBlank(displayName)) {
 				b.append(" - ");
 				b.append(displayName);
 				b.append(" ");
 			} else if (myComponentPath.size() > 1) {
-				// For components without a display name, try to extract from parent composite
 				String componentName = extractComponentName();
 				if (StringUtils.isNotBlank(componentName)) {
 					b.append(" - ");
@@ -2802,7 +2785,7 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 			b.append(" (");
 			b.append(getDataTypeDescription());
 			b.append(")");
-			b.append("</font>");
+			b.append("</i>");
 
 			return b;
 		}
@@ -2911,7 +2894,7 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		@Override
 		public StringBuilder getNodeText() {
 			StringBuilder retVal = new StringBuilder();
-			retVal.append("<html><font color=\"#FF0000\">Unknown</font><font color=\"#A0A0A0\"> ");
+			retVal.append("<b>Unknown</b> ");
 
 			int countLines = StringUtil.countLines(myMessage.getSourceMessage().trim());
 			retVal.append(countLines);
@@ -2921,7 +2904,6 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 				retVal.append("s");
 			}
 
-			retVal.append("</font></html>");
 			return retVal;
 		}
 
@@ -2935,14 +2917,12 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		@Override
 		public StringBuilder getNodeText() {
 			StringBuilder retVal = new StringBuilder();
-			retVal.append("<html><font color=\"#4040A0\">");
 
 			Object object = getUserObject();
 			if (object != null) {
 				retVal.append(xmlEncode(object.toString()));
 			}
 
-			retVal.append("</font></html>");
 			return retVal;
 		}
 

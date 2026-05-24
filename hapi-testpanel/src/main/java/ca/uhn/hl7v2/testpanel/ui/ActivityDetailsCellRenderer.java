@@ -32,6 +32,7 @@ import java.awt.Font;
 
 import javax.swing.JScrollBar;
 import javax.swing.JTable;
+import javax.swing.UIManager;
 
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -58,8 +59,10 @@ public class ActivityDetailsCellRenderer extends ActivityCellRendererBase {
 	public ActivityDetailsCellRenderer(ActivityTable theTablePanel) {
 		super(theTablePanel);
 
-		myFixedWidthFont = new Font("Lucida Console", Font.PLAIN, 12);
-		myVarWidthFont = new Font("Lucida", Font.PLAIN, 12);
+		Font labelFont = UIManager.getFont("Label.font");
+		int uiFontSize = labelFont != null ? labelFont.getSize() : 12;
+		myFixedWidthFont = new Font(Font.MONOSPACED, Font.PLAIN, uiFontSize);
+		myVarWidthFont = new Font(Font.DIALOG, Font.PLAIN, uiFontSize);
 	}
 
 	@Override
@@ -239,7 +242,7 @@ public class ActivityDetailsCellRenderer extends ActivityCellRendererBase {
 		String rawMessage = b.toString();
 		setText(rawMessage);
 		setFont(myFixedWidthFont);
-		setForeground(Color.black);
+		setForeground(UIManager.getColor("Table.foreground"));
 
 		updatePreferredHeight(theTable, theRow);
 //		updateHeight(theTable, theRow);
@@ -247,9 +250,9 @@ public class ActivityDetailsCellRenderer extends ActivityCellRendererBase {
 
 	private void renderInfo(final JTable theTable, Object theValue, final int theRow) {
 		if (theValue instanceof ActivityInfoError) {
-			setForeground(Color.red);
+			setForeground(new Color(220, 60, 60));
 		} else {
-			setForeground(Color.black);
+			setForeground(UIManager.getColor("Table.foreground"));
 		}
 
 		String message = ((ActivityInfo) theValue).getMessage();
@@ -335,7 +338,7 @@ public class ActivityDetailsCellRenderer extends ActivityCellRendererBase {
 		}
 
 //		setBackground(Color.white);
-		setForeground(Color.black);
+		setForeground(UIManager.getColor("Table.foreground"));
 		setFont(myFixedWidthFont);
 
 		updatePreferredHeight(theTable, theRow);

@@ -30,6 +30,8 @@ import static org.apache.commons.lang.StringUtils.*;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Point;
+
+import javax.swing.UIManager;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
@@ -183,6 +185,9 @@ public class Prefs {
 	@XmlElement(name = "save_line_endings")
 	private String mySaveLineEndings;
 
+	@XmlElement(name = "theme")
+	private String myTheme;
+
 	@XmlElement(name = "save_path_messages")
 	private String mySavePathMessages;
 
@@ -254,21 +259,24 @@ public class Prefs {
 	}
 
 	public Font getHl7EditorFont() {
-		Font retVal;
+		Font labelFont = UIManager.getFont("EditorPane.font");
+		if (labelFont == null) labelFont = UIManager.getFont("Label.font");
+		int fontSize = labelFont != null ? labelFont.getSize() : 12;
 
+		Font retVal;
 		List<String> fonts = FontUtil.getMonospacedFontNames();
 		if (fonts.contains("Monaco")) {
-			retVal = new Font("Monaco", Font.PLAIN, 12);
+			retVal = new Font("Monaco", Font.PLAIN, fontSize);
 		} else if (fonts.contains("Andale Mono")) {
-			retVal = new Font("Andale Mono", Font.PLAIN, 12);
+			retVal = new Font("Andale Mono", Font.PLAIN, fontSize);
 		} else if (fonts.contains("Lucida Console")) {
-			retVal = new Font("Lucida Console", Font.PLAIN, 12);
+			retVal = new Font("Lucida Console", Font.PLAIN, fontSize);
 		} else if (fonts.contains("Consolas")) {
-			retVal = new Font("Consolas", Font.PLAIN, 12);
+			retVal = new Font("Consolas", Font.PLAIN, fontSize);
 		} else if (fonts.contains("Lucida Sans Typewriter")) {
-			retVal = new Font("Lucida Sans Typewriter", Font.PLAIN, 12);
+			retVal = new Font("Lucida Sans Typewriter", Font.PLAIN, fontSize);
 		} else {
-			retVal = new Font("Monospace", Font.PLAIN, 12);
+			retVal = new Font(Font.MONOSPACED, Font.PLAIN, fontSize);
 		}
 
 		ourLog.info("Got font for HL7 editor: {}", retVal);
@@ -679,6 +687,15 @@ public class Prefs {
 	public void setSaveLineEndings(LineEndingsEnum theValue) {
 		Validate.notNull(theValue);
 		mySaveLineEndings = theValue.name();
+		sync();
+	}
+
+	public String getTheme() {
+		return myTheme != null ? myTheme : "system";
+	}
+
+	public void setTheme(String theTheme) {
+		myTheme = theTheme;
 		sync();
 	}
 

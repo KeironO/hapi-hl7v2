@@ -112,9 +112,9 @@ public class Hl7V2FileDiffController {
 	/**
 	 * @return the running
 	 */
-	public boolean isRunning() {
-		return myRunning;
-	}
+	public boolean isRunning()          { return myRunning; }
+	public int getNumMessagesTotal()    { return myNumMessagesTotal; }
+	public int getNumMessagesFailed()   { return myNumMessagesFailed; }
 
 	public void removePropertyChangeListener(String theProperty, PropertyChangeListener listener) {
 		this.myPcs.removePropertyChangeListener(theProperty, listener);
@@ -397,41 +397,25 @@ public class Hl7V2FileDiffController {
 		private void displayVisualDiff(Hl7V2MessageCompare theComparison) {
 			try {
 				String expected = theComparison.getExpectedMessage().encode();
-				String actual = theComparison.getActualMessage().encode();
+				String actual   = theComparison.getActualMessage().encode();
 
 				String[] expectedLines = expected.split("\r");
-				String[] actualLines = actual.split("\r");
+				String[] actualLines   = actual.split("\r");
 
 				int maxLines = Math.max(expectedLines.length, actualLines.length);
-				boolean[] differences = new boolean[maxLines];
-
-				for (int i = 0; i < maxLines; i++) {
-					String expLine = i < expectedLines.length ? expectedLines[i] : "";
-					String actLine = i < actualLines.length ? actualLines[i] : "";
-					differences[i] = !expLine.equals(actLine);
-				}
-
 				if (expectedLines.length < maxLines) {
 					expectedLines = Arrays.copyOf(expectedLines, maxLines);
-					for (int i = theComparison.getExpectedMessage().encode().split("\r").length; i < maxLines; i++) {
-						expectedLines[i] = "";
-					}
+					for (int i = theComparison.getExpectedMessage().encode().split("\r").length; i < maxLines; i++) expectedLines[i] = "";
 				}
-
 				if (actualLines.length < maxLines) {
 					actualLines = Arrays.copyOf(actualLines, maxLines);
-					for (int i = theComparison.getActualMessage().encode().split("\r").length; i < maxLines; i++) {
-						actualLines[i] = "";
-					}
+					for (int i = theComparison.getActualMessage().encode().split("\r").length; i < maxLines; i++) actualLines[i] = "";
 				}
 
+				final int finalMsgNum        = myNumMessagesFailed;
 				final String[] finalExpected = expectedLines;
-				final String[] finalActual = actualLines;
-				final boolean[] finalDifferences = differences;
-
-				SwingUtilities.invokeLater(() -> {
-					myView.getVisualDiffPanel().displayDiff(finalExpected, finalActual, finalDifferences);
-				});
+				final String[] finalActual   = actualLines;
+				SwingUtilities.invokeLater(() -> myView.displayDiff(finalMsgNum, finalExpected, finalActual));
 			} catch (Exception e) {
 				ourLog.error("Failed to display visual diff", e);
 			}

@@ -52,6 +52,7 @@ import java.util.List;
 
 import javax.swing.Box;
 import javax.swing.DefaultListCellRenderer;
+import javax.swing.UIManager;
 import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -60,6 +61,7 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -80,6 +82,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ca.uhn.hl7v2.HL7Exception;
+import ca.uhn.hl7v2.testpanel.App;
 import ca.uhn.hl7v2.testpanel.controller.Controller;
 import ca.uhn.hl7v2.testpanel.controller.Hl7V2FileDiffController;
 import ca.uhn.hl7v2.testpanel.controller.Hl7V2FileSortController;
@@ -375,6 +378,24 @@ public class TestPanelWindow implements IDestroyable {
 					}
 				}
 			}
+
+			@Override
+			public void mouseClicked(java.awt.event.MouseEvent e) {
+				if (e.getButton() == java.awt.event.MouseEvent.BUTTON2) {
+					int idx = myMessagesTabPane.indexAtLocation(e.getX(), e.getY());
+					if (idx >= 0) {
+						Hl7V2MessageCollection msg = (Hl7V2MessageCollection) myMessagesTabPane.getClientProperty("msg_" + idx);
+						if (msg != null) {
+							try {
+								myController.closeMessage(msg);
+							} catch (Exception ex) {
+								ourLog.warn("Error closing message", ex);
+								myController.getMessagesList().removeMessage(msg);
+							}
+						}
+					}
+				}
+			}
 		});
 
 		myConnectionsTabPane = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.WRAP_TAB_LAYOUT);
@@ -599,19 +620,39 @@ public class TestPanelWindow implements IDestroyable {
 		mainPanel.add(myWorkspacePanel, BorderLayout.CENTER);
 
 		// Status bar footer
-		JPanel statusBarPanel = new JPanel(new BorderLayout());
-		statusBarPanel.setBorder(javax.swing.BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(200, 200, 200)));
+		JPanel statusBarPanel = new JPanel(new BorderLayout()) {
+			@Override public void updateUI() {
+				super.updateUI();
+				Color sep = UIManager.getColor("Separator.foreground");
+				if (sep == null) sep = UIManager.getColor("Panel.background");
+				setBorder(javax.swing.BorderFactory.createMatteBorder(1, 0, 0, 0, sep));
+			}
+		};
+		statusBarPanel.updateUI();
 
-		myStatusBar = new JLabel(" No workspace open");
+		myStatusBar = new JLabel(" No workspace open") {
+			@Override public void updateUI() {
+				super.updateUI();
+				Color fg = UIManager.getColor("Label.disabledForeground");
+				if (fg == null) fg = UIManager.getColor("Label.foreground");
+				setForeground(fg);
+			}
+		};
 		myStatusBar.setBorder(javax.swing.BorderFactory.createEmptyBorder(3, 8, 3, 8));
 		myStatusBar.setFont(myStatusBar.getFont().deriveFont(11f));
-		myStatusBar.setForeground(new Color(100, 100, 100));
+		myStatusBar.updateUI();
 		statusBarPanel.add(myStatusBar, BorderLayout.WEST);
 
-		myTerserPathStatusLabel = new JLabel();
+		myTerserPathStatusLabel = new JLabel() {
+			@Override public void updateUI() {
+				super.updateUI();
+				boolean dark = App.isCurrentlyDark();
+				setForeground(dark ? new Color(100, 160, 255) : new Color(60, 100, 180));
+			}
+		};
 		myTerserPathStatusLabel.setBorder(javax.swing.BorderFactory.createEmptyBorder(3, 8, 3, 8));
 		myTerserPathStatusLabel.setFont(myTerserPathStatusLabel.getFont().deriveFont(11f));
-		myTerserPathStatusLabel.setForeground(new Color(60, 100, 180));
+		myTerserPathStatusLabel.updateUI();
 		statusBarPanel.add(myTerserPathStatusLabel, BorderLayout.EAST);
 
 		mainPanel.add(statusBarPanel, BorderLayout.SOUTH);
@@ -654,7 +695,7 @@ public class TestPanelWindow implements IDestroyable {
 		// Add resizable connections pane to the bottom with a split divider
 		JSplitPane editorSplitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, myEditorContentPanel, myConnectionsTabPane);
 		editorSplitPane.setDividerLocation(0.85);
-		editorSplitPane.setOneTouchExpandable(true);
+		editorSplitPane.setOneTouchExpandable(false);
 		editorSplitPane.setBorder(null);
 		centerPanel.add(editorSplitPane, BorderLayout.CENTER);
 
@@ -713,8 +754,23 @@ public class TestPanelWindow implements IDestroyable {
 	private void initializeMenuBar(JMenuBar menuBar) {
 		createFileMenu(menuBar);
 		createEditMenu(menuBar);
+		createViewMenu(menuBar);
 		createToolsMenu(menuBar);
 		createHelpMenu(menuBar);
+	}
+
+	private void createViewMenu(JMenuBar menuBar) {
+		JMenu viewMenu = new JMenu("View");
+		menuBar.add(viewMenu);
+
+		boolean currentlyDark = App.resolveUseDark(Prefs.getInstance().getTheme());
+		JCheckBoxMenuItem darkModeItem = new JCheckBoxMenuItem("Dark Mode", currentlyDark);
+		darkModeItem.addActionListener(e -> {
+			String newTheme = darkModeItem.isSelected() ? "dark" : "light";
+			Prefs.getInstance().setTheme(newTheme);
+			App.applyTheme(newTheme);
+		});
+		viewMenu.add(darkModeItem);
 	}
 
 	private void createEditMenu(JMenuBar menuBar) {
@@ -861,7 +917,7 @@ public class TestPanelWindow implements IDestroyable {
 			Hl7V2MessageCollection source = (Hl7V2MessageCollection) evt.getSource();
 			List<Hl7V2MessageCollection> messages = myController.getMessagesList().getMessages();
 			int i = messages.indexOf(source);
-			if (i >= 0) myMessagesTabPane.setTitleAt(i, buildTabTitle(source));
+			if (i >= 0) updateTabComponentTitle(i, buildTabTitle(source));
 		};
 		myController.getMessagesList().addPropertyChangeListener(
 			MessagesList.PROP_LIST,
@@ -1095,15 +1151,26 @@ public class TestPanelWindow implements IDestroyable {
 		return "<html><font color='red'>" + collection.getMessageDescription() + "*</font></html>";
 	}
 
+	private void updateTabComponentTitle(int i, String title) {
+		myMessagesTabPane.setTitleAt(i, title);
+		Component tabComp = myMessagesTabPane.getTabComponentAt(i);
+		if (tabComp instanceof JPanel) {
+			for (Component c : ((JPanel) tabComp).getComponents()) {
+				if (c instanceof JLabel) {
+					((JLabel) c).setText(title);
+					break;
+				}
+			}
+		}
+	}
+
 	private void setupTabCloseButtons() {
 		for (int i = 0; i < myMessagesTabPane.getTabCount(); i++) {
 			JPanel tabComponent = new JPanel(new BorderLayout(5, 0));
 			tabComponent.setOpaque(false);
 
 			String title = myMessagesTabPane.getTitleAt(i);
-			// Strip HTML tags for display in label
-			String plainText = title.replaceAll("<[^>]*>", "");
-			JLabel label = new JLabel(plainText);
+			JLabel label = new JLabel(title);
 			tabComponent.add(label, BorderLayout.CENTER);
 
 			JButton closeButton = new JButton("×");
@@ -1133,8 +1200,11 @@ public class TestPanelWindow implements IDestroyable {
 	}
 
 	private static final Logger ourLog = LoggerFactory.getLogger(TestPanelWindow.class);
-	private static final Color BG_SELECTED = new Color(0.8f, 0.8f, 1.0f);
-	private static final Color BG_NOT_SELECTED = Color.white;
+	private static Color listSelectedBackground() {
+		Color bg = UIManager.getColor("List.background");
+		if (bg == null) bg = Color.WHITE;
+		return new Color(Math.max(0, bg.getRed() - 20), Math.max(0, bg.getGreen() - 20), Math.min(255, bg.getBlue() + 45));
+	}
 	private JPanel myWorkspacePanel;
 	private JPanel myEditorContentPanel;
 	private JPanel myEditorInnerPanel;
@@ -1181,6 +1251,7 @@ public class TestPanelWindow implements IDestroyable {
 		 */
 		@Override
 		public Component getListCellRendererComponent(JList theList, Object theValue, int theIndex, boolean theIsSelected, boolean theCellHasFocus) {
+			super.getListCellRendererComponent(theList, theValue, theIndex, theIsSelected, theCellHasFocus);
 			OutboundConnection obj = (OutboundConnection) theValue;
 			switch (obj.getStatus()) {
 			case STARTED:
@@ -1199,7 +1270,7 @@ public class TestPanelWindow implements IDestroyable {
 			StringBuilder b = new StringBuilder();
 			b.append(obj.getName());
 			boolean html = false;
-			
+
 			if (!obj.isPersistent()) {
 				b.insert(0, "<font color=\\\"red\\\" size=\\\"2\\\">temp</font> ");
 				html = true;
@@ -1209,23 +1280,23 @@ public class TestPanelWindow implements IDestroyable {
 				b.append(" - <font color=\\\"red\\\">").append(obj.getNewMessages()).append(" new</font> ");
 				html = true;
 			}
-			
+
 			if (obj.getStatus() == StatusEnum.FAILED) {
 				b.append(" <font color=\"red\" size=\"2\">(failed)</font> ");
 				html = true;
 			}
-			
 
 			if (html) {
 				setText("<html><nobr>" + b.toString()+"</nobr></html>");
-			}else {
+			} else {
 				setText(b.toString());
 			}
-			
+
 			if (theValue == myController.getLeftSelectedItem()) {
-				setBackground(BG_SELECTED);
+				setBackground(listSelectedBackground());
 			} else {
-				setBackground(BG_NOT_SELECTED);
+				Color bg = UIManager.getColor("List.background");
+				setBackground(bg != null ? bg : Color.WHITE);
 			}
 
 			return this;
@@ -1244,6 +1315,7 @@ public class TestPanelWindow implements IDestroyable {
 		 */
 		@Override
 		public Component getListCellRendererComponent(JList theList, Object theValue, int theIndex, boolean theIsSelected, boolean theCellHasFocus) {
+			super.getListCellRendererComponent(theList, theValue, theIndex, theIsSelected, theCellHasFocus);
 			InboundConnection obj = (InboundConnection) theValue;
 			switch (obj.getStatus()) {
 			case STARTED:
@@ -1262,7 +1334,7 @@ public class TestPanelWindow implements IDestroyable {
 			StringBuilder b = new StringBuilder();
 			b.append(obj.getName());
 			boolean html = false;
-			
+
 			if (!obj.isPersistent()) {
 				b.insert(0, "<font color=\"red\" size=\"2\">temp</font> ");
 				html = true;
@@ -1272,22 +1344,23 @@ public class TestPanelWindow implements IDestroyable {
 				b.append(" <font color=\"red\" size=\"2\">(").append(obj.getNewMessages()).append(" new)</font> ");
 				html = true;
 			}
-			
+
 			if (obj.getStatus() == StatusEnum.FAILED) {
 				b.append(" <font color=\"red\" size=\"2\">(failed)</font> ");
 				html = true;
 			}
-			
+
 			if (html) {
 				setText("<html><nobr>" + b.toString()+"</nobr></html>");
-			}else {
+			} else {
 				setText(b.toString());
 			}
-			
+
 			if (theValue == myController.getLeftSelectedItem()) {
-				setBackground(BG_SELECTED);
+				setBackground(listSelectedBackground());
 			} else {
-				setBackground(BG_NOT_SELECTED);
+				Color bg = UIManager.getColor("List.background");
+				setBackground(bg != null ? bg : Color.WHITE);
 			}
 
 			return this;

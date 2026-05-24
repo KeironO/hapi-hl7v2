@@ -29,10 +29,10 @@ import java.awt.Color;
 import java.awt.Component;
 
 import javax.swing.JTable;
+import javax.swing.UIManager;
 import javax.swing.table.DefaultTableCellRenderer;
 
 public class ActivityCellRendererBase extends DefaultTableCellRenderer {
-	private static final Color RESPONSE_ROW_COLOUR = new Color(0.9f, 0.9f, 1.0f);
 	private ActivityTable myTablePanel;
 
 	public ActivityCellRendererBase(ActivityTable theTablePanel) {
@@ -60,15 +60,23 @@ public class ActivityCellRendererBase extends DefaultTableCellRenderer {
 	}
 
 	public static void adjustBackground(boolean theIsSelected, int theRow, Component retVal, ActivityTable theTablePanel) {
-		if (theIsSelected) {
-			// leave it as is
-		} else {
+		if (!theIsSelected) {
+			Color tableBg = UIManager.getColor("Table.background");
+			if (tableBg == null) tableBg = Color.WHITE;
 			if (theTablePanel.isResponseAtRow(theRow)) {
-				retVal.setBackground(RESPONSE_ROW_COLOUR);
+				retVal.setBackground(responseRowColor(tableBg));
 			} else {
-				retVal.setBackground(Color.WHITE);
+				retVal.setBackground(tableBg);
 			}
 		}
+	}
+
+	private static Color responseRowColor(Color base) {
+		return new Color(
+			Math.max(0, base.getRed() - 15),
+			Math.max(0, base.getGreen() - 15),
+			Math.min(255, base.getBlue() + 30)
+		);
 	}
 
 }

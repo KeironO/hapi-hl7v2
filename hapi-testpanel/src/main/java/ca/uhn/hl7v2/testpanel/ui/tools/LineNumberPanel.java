@@ -8,6 +8,7 @@ import java.awt.Graphics;
 
 import javax.swing.JEditorPane;
 import javax.swing.JPanel;
+import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
@@ -21,10 +22,24 @@ public class LineNumberPanel extends JPanel implements DocumentListener {
 	public LineNumberPanel(JEditorPane editorPane) {
 		myEditorPane = editorPane;
 		myEditorPane.getDocument().addDocumentListener(this);
-		setBackground(new Color(240, 240, 240));
-		setForeground(Color.BLACK);
-		setFont(new Font("Monospaced", Font.PLAIN, 12));
+		updateUI();
 		setPreferredSize(new Dimension(50, 0));
+	}
+
+	@Override
+	public void updateUI() {
+		super.updateUI();
+		Color bg = UIManager.getColor("EditorPane.background");
+		if (bg != null) {
+			float[] hsb = Color.RGBtoHSB(bg.getRed(), bg.getGreen(), bg.getBlue(), null);
+			float adj = hsb[2] > 0.5f ? -0.06f : 0.06f;
+			setBackground(Color.getHSBColor(hsb[0], hsb[1], Math.max(0f, Math.min(1f, hsb[2] + adj))));
+		}
+		Color fg = UIManager.getColor("Label.foreground");
+		if (fg != null) setForeground(fg);
+		Font labelFont = UIManager.getFont("Label.font");
+		int uiFontSize = labelFont != null ? labelFont.getSize() : 12;
+		setFont(new Font(Font.MONOSPACED, Font.PLAIN, uiFontSize));
 	}
 
 	@Override

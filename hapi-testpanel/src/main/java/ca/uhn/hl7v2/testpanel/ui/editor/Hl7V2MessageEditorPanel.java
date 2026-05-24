@@ -45,6 +45,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -65,6 +66,7 @@ import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 import javax.swing.event.CaretEvent;
 import javax.swing.event.CaretListener;
 import javax.swing.event.DocumentEvent;
@@ -74,6 +76,7 @@ import javax.swing.text.Highlighter;
 import org.fife.ui.rsyntaxtextarea.AbstractTokenMakerFactory;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants;
+import org.fife.ui.rsyntaxtextarea.Theme;
 import org.fife.ui.rsyntaxtextarea.TokenMakerFactory;
 import org.fife.ui.rtextarea.RTextScrollPane;
 import org.fife.rsta.ui.search.FindDialog;
@@ -95,6 +98,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ca.uhn.hl7v2.conf.ProfileException;
+import ca.uhn.hl7v2.testpanel.App;
 import ca.uhn.hl7v2.testpanel.controller.Controller;
 import ca.uhn.hl7v2.testpanel.controller.Prefs;
 import ca.uhn.hl7v2.testpanel.model.conf.ProfileFileList;
@@ -227,6 +231,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		myMessageEditor.setSelectionColor(new Color(100, 150, 255, 150));
 		myMessageEditor.setSelectedTextColor(null);
 		myMessageEditor.setFont(resolveEditorFont(14));
+		applyEditorTheme();
 
 		myMessageEditor.addCaretListener(new javax.swing.event.CaretListener() {
 			public void caretUpdate(javax.swing.event.CaretEvent e) {
@@ -502,6 +507,26 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 
 	}
 
+
+	@Override
+	public void updateUI() {
+		super.updateUI();
+		if (myMessageEditor != null) {
+			applyEditorTheme();
+		}
+	}
+
+	private void applyEditorTheme() {
+		boolean dark = App.isCurrentlyDark();
+		String themePath = dark
+			? "/org/fife/ui/rsyntaxtextarea/themes/dark.xml"
+			: "/org/fife/ui/rsyntaxtextarea/themes/default.xml";
+		try (InputStream in = getClass().getResourceAsStream(themePath)) {
+			if (in != null) {
+				Theme.load(in).apply(myMessageEditor);
+			}
+		} catch (Exception ignored) {}
+	}
 
 	public void destroy() {
 		myMessage.removePropertyChangeListener(Hl7V2MessageCollection.SOURCE_MESSAGE_PROPERTY, myMessageListeneer);

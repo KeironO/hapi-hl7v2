@@ -172,6 +172,9 @@ public class Hl7ConnectionPanelHeader extends JPanel implements IDestroyable {
 		myNameBox.getDocument().addDocumentListener(new SimpleDocumentListener() {
 			@Override
 			public void update(DocumentEvent theE) {
+				if (!myNameBox.isEnabled()) {
+					return;
+				}
 				myIgnoreNameChanges = true;
 				try {
 					myConnection.setNameExplicitly(myNameBox.getText());

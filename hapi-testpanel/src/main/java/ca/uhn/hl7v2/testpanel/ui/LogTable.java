@@ -61,7 +61,10 @@ public class LogTable extends JScrollPane {
         myLogTable.setFillsViewportHeight(true);
         myLogTable.setShowHorizontalLines(false);
         myLogTable.setShowVerticalLines(false);
-        
+        myLogTable.setBackground(Color.WHITE);
+        myLogTable.setForeground(Color.BLACK);
+        getViewport().setBackground(Color.WHITE);
+
         setViewportView(myLogTable);
 		
         myModel = new Model();
@@ -86,7 +89,11 @@ public class LogTable extends JScrollPane {
 		@Override
 		public Component getTableCellRendererComponent(JTable theTable, Object theValue, boolean theIsSelected, boolean theHasFocus, int theRow, int theColumn) {
 			Component retVal = super.getTableCellRendererComponent(theTable, theValue, theIsSelected, theHasFocus, theRow, theColumn);
-			
+
+			if (!theIsSelected) {
+				retVal.setBackground(Color.WHITE);
+			}
+
 			Level level = (Level) myModel.getValueAt(theRow, 0);
 			if (level == Level.WARN) {
 				retVal.setForeground(CLR_WARN);

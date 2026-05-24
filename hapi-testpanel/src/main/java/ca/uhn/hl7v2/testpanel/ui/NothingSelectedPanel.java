@@ -25,7 +25,6 @@
  */
 package ca.uhn.hl7v2.testpanel.ui;
 
-import java.awt.Color;
 import java.awt.Desktop;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -43,6 +42,7 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
+import javax.swing.UIManager;
 
 import ca.uhn.hl7v2.testpanel.controller.Controller;
 
@@ -60,7 +60,6 @@ public class NothingSelectedPanel extends BaseMainPanel {
 		setLayout(gridBagLayout);
 		
 		JPanel panel = new JPanel();
-		panel.setBackground(Color.WHITE);
 		GridBagConstraints gbc_panel = new GridBagConstraints();
 		gbc_panel.insets = new Insets(0, 0, 5, 0);
 		gbc_panel.fill = GridBagConstraints.BOTH;
@@ -124,7 +123,7 @@ public class NothingSelectedPanel extends BaseMainPanel {
 			}
 		});
 		lblViewLicenseInformation.setHorizontalAlignment(SwingConstants.CENTER);
-		lblViewLicenseInformation.setForeground(Color.BLACK);
+		lblViewLicenseInformation.setForeground(UIManager.getColor("Label.foreground"));
 		GridBagConstraints gbc_lblViewLicenseInformation = new GridBagConstraints();
 		gbc_lblViewLicenseInformation.fill = GridBagConstraints.HORIZONTAL;
 		gbc_lblViewLicenseInformation.anchor = GridBagConstraints.SOUTH;
