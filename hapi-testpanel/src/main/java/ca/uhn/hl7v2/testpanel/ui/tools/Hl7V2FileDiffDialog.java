@@ -25,6 +25,7 @@ import org.fife.ui.rtextarea.RTextScrollPane;
 import ca.uhn.hl7v2.testpanel.App;
 import ca.uhn.hl7v2.testpanel.controller.Hl7V2FileDiffController;
 import ca.uhn.hl7v2.testpanel.controller.Prefs;
+import ca.uhn.hl7v2.testpanel.ui.ImageFactory;
 import ca.uhn.hl7v2.testpanel.ui.Er7TokenMaker;
 import ca.uhn.hl7v2.testpanel.util.SimpleDocumentListener;
 
@@ -436,13 +437,13 @@ public class Hl7V2FileDiffDialog extends JDialog {
 		panel.setLayout(gbl);
 
 		myBeginButton = new JButton("Begin");
-		myBeginButton.setIcon(new ImageIcon(getClass().getResource("/ca/uhn/hl7v2/testpanel/images/start_all.png")));
+		myBeginButton.setIcon(ImageFactory.getStartAll());
 		myBeginButton.setFont(myBeginButton.getFont().deriveFont(12f));
 		myBeginButton.addActionListener(e -> { clearResults(); switchToInputMode(); myController.begin(); });
 		panel.add(myBeginButton, gbc(0, new Insets(0, 5, 0, 10)));
 
 		myStopButton = new JButton("Stop");
-		myStopButton.setIcon(new ImageIcon(getClass().getResource("/ca/uhn/hl7v2/testpanel/images/stop_all.png")));
+		myStopButton.setIcon(ImageFactory.getStopAll());
 		myStopButton.setFont(myStopButton.getFont().deriveFont(12f));
 		myStopButton.addActionListener(e -> myController.cancel());
 		panel.add(myStopButton, gbc(1, new Insets(0, 0, 0, 10)));

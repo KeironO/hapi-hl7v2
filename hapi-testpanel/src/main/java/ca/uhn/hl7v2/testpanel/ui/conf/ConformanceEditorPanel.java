@@ -20,7 +20,6 @@ import java.util.List;
 import javax.swing.Box;
 import javax.swing.DefaultCellEditor;
 import javax.swing.Icon;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
@@ -297,7 +296,7 @@ public class ConformanceEditorPanel {
 		myNewProfileGroupButton = new JButton("New Profile Group");
 		myNewProfileGroupButton.setToolTipText("Creates a new profile group (which may contain multiple conformance profiles associated with different message types and table mappings)");
 		myNewProfileGroupButton.setBorderPainted(false);
-		myNewProfileGroupButton.setIcon(new ImageIcon(ConformanceEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/new_tree.png")));
+		myNewProfileGroupButton.setIcon(ImageFactory.getProfileGroup());
 		myNewProfileGroupButton.addMouseListener(new HoverButtonMouseAdapter(myNewProfileGroupButton));
 		myNewProfileGroupButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent theE) {
@@ -339,10 +338,10 @@ public class ConformanceEditorPanel {
 				myController.renameProfileGroup(sel);
 			}
 		});
-		myRenameButton.setIcon(new ImageIcon(ConformanceEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/rename.png")));
+		myRenameButton.setIcon(ImageFactory.getRename());
 		profilesToolbar.add(myRenameButton);
 		myRemoveProfileGroupButton.setBorderPainted(false);
-		myRemoveProfileGroupButton.setIcon(new ImageIcon(ConformanceEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/delete.png")));
+		myRemoveProfileGroupButton.setIcon(ImageFactory.getDelete());
 		myRemoveProfileGroupButton.addMouseListener(new HoverButtonMouseAdapter(myRemoveProfileGroupButton));
 		profilesToolbar.add(myRemoveProfileGroupButton);
 		
@@ -353,7 +352,7 @@ public class ConformanceEditorPanel {
 				myController.exportProfileGroup((ProfileGroup)getSelectedProfileGroupOrFile());
 			}
 		});
-		myExportButton.setIcon(new ImageIcon(ConformanceEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/save_all.png")));
+		myExportButton.setIcon(ImageFactory.getSaveAll());
 		myExportButton.setBorderPainted(false);
 		myExportButton.addMouseListener(new HoverButtonMouseAdapter(myExportButton));
 		profilesToolbar.add(myExportButton);
@@ -362,14 +361,14 @@ public class ConformanceEditorPanel {
 		btnImport.setToolTipText("Import a profile group");
 		btnImport.addMouseListener(new HoverButtonMouseAdapter(btnImport));
 		btnImport.setBorderPainted(false);
-		btnImport.setIcon(new ImageIcon(ConformanceEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/open.png")));
+		btnImport.setIcon(ImageFactory.getOpen());
 		btnImport.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent theE) {
 				myController.importProfileGroup();
 			}
 		});
 		profilesToolbar.add(btnImport);
-		myAddProfileButton.setIcon(new ImageIcon(ConformanceEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/profile.png")));
+		myAddProfileButton.setIcon(ImageFactory.getProfile());
 		profilesToolbar.add(myAddProfileButton);
 
 		myRemoveProfileButton = new JButton("Remove Profile");
@@ -379,7 +378,7 @@ public class ConformanceEditorPanel {
 				sel.getParentProfileGroup().removeEntry(sel);
 			}
 		});
-		myRemoveProfileButton.setIcon(new ImageIcon(ConformanceEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/close.png")));
+		myRemoveProfileButton.setIcon(ImageFactory.getClose());
 		myRemoveProfileButton.setBorderPainted(false);
 		myRemoveProfileButton.addMouseListener(new HoverButtonMouseAdapter(myRemoveProfileButton));
 		profilesToolbar.add(myRemoveProfileButton);
@@ -418,7 +417,7 @@ public class ConformanceEditorPanel {
 		});
 		btnAddTableFile.setToolTipText("New Table File...");
 		btnAddTableFile.setBorderPainted(false);
-		btnAddTableFile.setIcon(new ImageIcon(ConformanceEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/file.png")));
+		btnAddTableFile.setIcon(ImageFactory.getFile());
 		btnAddTableFile.addMouseListener(new HoverButtonMouseAdapter(btnAddTableFile));
 		toolBar.add(btnAddTableFile);
 
@@ -431,7 +430,7 @@ public class ConformanceEditorPanel {
 		});
 
 		myCloseFileButton = new JButton("Close File");
-		myCloseFileButton.setIcon(new ImageIcon(ConformanceEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/close.png")));
+		myCloseFileButton.setIcon(ImageFactory.getClose());
 		myCloseFileButton.addMouseListener(new HoverButtonMouseAdapter(myCloseFileButton));
 		myCloseFileButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -453,12 +452,12 @@ public class ConformanceEditorPanel {
 		toolBar.add(horizontalStrut_1);
 
 		myAddTableButton.setBorderPainted(false);
-		myAddTableButton.setIcon(new ImageIcon(ConformanceEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/table.png")));
+		myAddTableButton.setIcon(ImageFactory.getTable());
 		myAddTableButton.addMouseListener(new HoverButtonMouseAdapter(myAddTableButton));
 		toolBar.add(myAddTableButton);
 
 		myCloseTableButton = new JButton("Remove Table");
-		myCloseTableButton.setIcon(new ImageIcon(ConformanceEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/close.png")));
+		myCloseTableButton.setIcon(ImageFactory.getClose());
 		myCloseTableButton.setBorderPainted(false);
 		myCloseTableButton.addMouseListener(new HoverButtonMouseAdapter(myCloseTableButton));
 		myCloseTableButton.addActionListener(new ActionListener() {

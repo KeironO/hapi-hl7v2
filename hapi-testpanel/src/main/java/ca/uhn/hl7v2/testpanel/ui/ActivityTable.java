@@ -40,7 +40,6 @@ import java.util.LinkedList;
 import java.util.List;
 
 import javax.swing.Box;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
@@ -121,7 +120,7 @@ public class ActivityTable extends JPanel implements IDestroyable {
 
 		clearButton = new JButton("Clear");
 		clearButton.addMouseListener(new HoverButtonMouseAdapter(clearButton));
-		clearButton.setIcon(new ImageIcon(ActivityTable.class.getResource("/ca/uhn/hl7v2/testpanel/images/clear.png")));
+		clearButton.setIcon(ImageFactory.getClear());
 		clearButton.setBorderPainted(false);
 		clearButton.addActionListener(new ActionListener() {
 
@@ -135,7 +134,7 @@ public class ActivityTable extends JPanel implements IDestroyable {
 		mySaveButton.addMouseListener(new HoverButtonMouseAdapter(mySaveButton));
 		mySaveButton.setBorderPainted(false);
 		mySaveButton.setEnabled(false);
-		mySaveButton.setIcon(new ImageIcon(ActivityTable.class.getResource("/ca/uhn/hl7v2/testpanel/images/save.png")));
+		mySaveButton.setIcon(ImageFactory.getSave());
 		mySaveButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				mySaveMenu.show(mySaveButton, mySaveButton.getX(), mySaveButton.getY() + mySaveButton.getHeight());
@@ -147,7 +146,7 @@ public class ActivityTable extends JPanel implements IDestroyable {
 		myEditButton.setEnabled(false);
 		myEditButton.setBorderPainted(false);
 		myEditButton.addMouseListener(new HoverButtonMouseAdapter(myEditButton));
-		myEditButton.setIcon(new ImageIcon(ActivityTable.class.getResource("/ca/uhn/hl7v2/testpanel/images/edit_one.png")));
+		myEditButton.setIcon(ImageFactory.getEditOne());
 		myEditButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				myEditMenu.show(myEditButton, myEditButton.getX(), myEditButton.getY() + myEditButton.getHeight());
@@ -173,7 +172,7 @@ public class ActivityTable extends JPanel implements IDestroyable {
 		});
 		myStop.setEnabled(false);
 		myStop.setBorderPainted(false);
-		myStop.setIcon(new ImageIcon(ActivityTable.class.getResource("/ca/uhn/hl7v2/testpanel/images/stop.png")));
+		myStop.setIcon(ImageFactory.getStop());
 		myStop.addMouseListener(new HoverButtonMouseAdapter(myStop));
 		toolBar.add(myStop);
 
@@ -198,7 +197,7 @@ public class ActivityTable extends JPanel implements IDestroyable {
 		myEditMenu = new JPopupMenu();
 
 		myEditSelectedButton = new JMenuItem("Edit Selected Message");
-		myEditSelectedButton.setIcon(new ImageIcon(ActivityTable.class.getResource("/ca/uhn/hl7v2/testpanel/images/edit_one.png")));
+		myEditSelectedButton.setIcon(ImageFactory.getEditOne());
 		myEditSelectedButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent theE) {
 				ActivityMessage selected = (ActivityMessage) myActivityTableModel.getActivity(myTable.getSelectedRow());
@@ -208,7 +207,7 @@ public class ActivityTable extends JPanel implements IDestroyable {
 		myEditMenu.add(myEditSelectedButton);
 
 		myEditAllButton = new JMenuItem("Edit All Messages");
-		myEditAllButton.setIcon(new ImageIcon(ActivityTable.class.getResource("/ca/uhn/hl7v2/testpanel/images/edit_all.png")));
+		myEditAllButton.setIcon(ImageFactory.getEditAll());
 		myEditAllButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent theE) {
 				List<ActivityMessage> messages = myConnection.getRecentActivityEntriesOfType(ActivityMessage.class);
@@ -220,11 +219,11 @@ public class ActivityTable extends JPanel implements IDestroyable {
 		mySaveMenu = new JPopupMenu();
 
 		mySaveSelectedButton = new JMenuItem("Save Selected Message");
-		mySaveSelectedButton.setIcon(new ImageIcon(ActivityTable.class.getResource("/ca/uhn/hl7v2/testpanel/images/save.png")));
+		mySaveSelectedButton.setIcon(ImageFactory.getSave());
 		mySaveMenu.add(mySaveSelectedButton);
 
 		mySaveAllButton = new JMenuItem("Save All Messages");
-		mySaveAllButton.setIcon(new ImageIcon(ActivityTable.class.getResource("/ca/uhn/hl7v2/testpanel/images/save_all.png")));
+		mySaveAllButton.setIcon(ImageFactory.getSaveAll());
 		mySaveMenu.add(mySaveAllButton);
 
 		myTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {

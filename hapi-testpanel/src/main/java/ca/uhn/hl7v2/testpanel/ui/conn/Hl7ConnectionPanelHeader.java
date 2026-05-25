@@ -50,6 +50,7 @@ import ca.uhn.hl7v2.testpanel.model.conn.AbstractConnection.StatusEnum;
 import ca.uhn.hl7v2.testpanel.model.conn.InboundConnection;
 import ca.uhn.hl7v2.testpanel.model.conn.OutboundConnection;
 import ca.uhn.hl7v2.testpanel.ui.IDestroyable;
+import ca.uhn.hl7v2.testpanel.ui.ImageFactory;
 import ca.uhn.hl7v2.testpanel.util.SimpleDocumentListener;
 
 public class Hl7ConnectionPanelHeader extends JPanel implements IDestroyable {
@@ -214,6 +215,7 @@ public class Hl7ConnectionPanelHeader extends JPanel implements IDestroyable {
 		add(panel_5, gbc_panel_5);
 
 		myStartButton = new JButton("Start");
+		myStartButton.setIcon(ImageFactory.getStartOne());
 		myStartButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				myConnection.start();
@@ -222,6 +224,7 @@ public class Hl7ConnectionPanelHeader extends JPanel implements IDestroyable {
 		panel_5.add(myStartButton);
 
 		myStopButton = new JButton("Stop");
+		myStopButton.setIcon(ImageFactory.getStop());
 		myStopButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				myConnection.stop();

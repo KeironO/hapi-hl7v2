@@ -23,146 +23,268 @@
  * If you do not delete the provisions above, a recipient may use your version of
  * this file under either the MPL or the GPL.
  */
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package ca.uhn.hl7v2.testpanel.ui;
 
+import java.awt.Color;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
+import javax.swing.UIManager;
+
+import com.formdev.flatlaf.extras.FlatSVGIcon;
 
 /**
- * 
- * @author James
+ * Factory for application icons. SVG icons are loaded via FlatSVGIcon so that
+ * FlatLaf can apply its colour filter for dark-mode support automatically.
  */
 public class ImageFactory {
-	// ~ Static fields/initializers
-	// -------------------------------------------------------------------------------------
 
-	private static Map<String, ImageIcon> ourIcons = new HashMap<String, ImageIcon>();
+	private static Map<String, Icon> ourIcons = new HashMap<String, Icon>();
 
 	public static void clearCache() {
 		ourIcons.clear();
 	}
 
-	// ~ Methods
-	// --------------------------------------------------------------------------------------------------------
+	// -------------------------------------------------------------------------
+	// Helper methods
+	// -------------------------------------------------------------------------
 
-	public static ImageIcon getButtonExecute() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/button_execute.png");
-	}
+	private static final FlatSVGIcon.ColorFilter FOREGROUND_FILTER = new FlatSVGIcon.ColorFilter() {
+		@Override
+		public Color filter(Color color) {
+			Color fg = UIManager.getColor("Label.foreground");
+			return fg != null ? fg : color;
+		}
+	};
 
-	public static ImageIcon getProfile() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/profile.png");
-	}
-
-	public static ImageIcon getProfileGroup() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/new_tree.png");
-	}
-
-	public static ImageIcon getFile() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/file.png");
-	}
-
-	public static ImageIcon getTable() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/table.png");
-	}
-
-	public static ImageIcon getNo() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/no.png");
-	}
-
-	private static ImageIcon getImageIcon(String theLocation) {
-		ImageIcon retVal = ourIcons.get(theLocation);
+	private static Icon getSVGIcon(String path) {
+		Icon retVal = ourIcons.get(path);
 		if (retVal == null) {
-			URL resource = ImageFactory.class.getClassLoader().getResource(theLocation);
-			if (resource == null) {
-				throw new Error(theLocation);
-			}
-			retVal = new ImageIcon(resource);
-			ourIcons.put(theLocation, retVal);
+			FlatSVGIcon icon = new FlatSVGIcon(path, 18, 18);
+			icon.setColorFilter(FOREGROUND_FILTER);
+			retVal = icon;
+			ourIcons.put(path, retVal);
 		}
 		return retVal;
 	}
 
-	public static ImageIcon getInterfaceOff() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/interface_off.png");
-	}
-
+	/** Kept for hapi_64.png which is used as an AWT window icon (must be raster). */
 	public static ImageIcon getHapi64() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/hapi_64.png");
+		String location = "ca/uhn/hl7v2/testpanel/images/hapi_64.png";
+		Icon cached = ourIcons.get(location);
+		if (cached instanceof ImageIcon) {
+			return (ImageIcon) cached;
+		}
+		URL resource = ImageFactory.class.getClassLoader().getResource(location);
+		if (resource == null) {
+			throw new Error(location);
+		}
+		ImageIcon icon = new ImageIcon(resource);
+		ourIcons.put(location, icon);
+		return icon;
 	}
 
-	public static ImageIcon getInterfaceOn() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/interface_on.png");
+	// -------------------------------------------------------------------------
+	// Original mapped methods (PNG -> SVG)
+	// -------------------------------------------------------------------------
+
+	public static Icon getButtonExecute() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/player-play.svg");
+	}
+
+	public static Icon getProfile() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/id-badge-2.svg");
+	}
+
+	public static Icon getProfileGroup() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/folder-plus.svg");
+	}
+
+	public static Icon getFile() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/file.svg");
+	}
+
+	public static Icon getTable() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/table.svg");
+	}
+
+	public static Icon getNo() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/ban.svg");
+	}
+
+	public static Icon getInterfaceOff() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/plug-x.svg");
+	}
+
+	public static Icon getInterfaceOn() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/plug-connected.svg");
 	}
 
 	public static Icon getInterfaceStarting() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/interface_starting.png");
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/loader.svg");
 	}
 
-	public static ImageIcon getMessageHl7() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/message_hl7.png");
+	public static Icon getMessageHl7() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/file-text.svg");
 	}
 
-	public static ImageIcon getMessageIn() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/message_in.png");
+	public static Icon getMessageIn() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/inbox.svg");
 	}
 
-	public static ImageIcon getMessageOut() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/message_out.png");
+	public static Icon getMessageOut() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/send.svg");
 	}
 
-	public static ImageIcon getMessageXml() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/message_xml.png");
+	public static Icon getMessageXml() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/file-code.svg");
 	}
 
-	public static ImageIcon getTabLog() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/tab_log.png");
+	public static Icon getTabLog() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/terminal.svg");
 	}
 
-	public static ImageIcon getTest() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/test.png");
+	public static Icon getTest() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/test-pipe.svg");
 	}
 
-	public static ImageIcon getTestFailed() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/test_failed.png");
+	public static Icon getTestFailed() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/test-pipe-off.svg");
 	}
 
-	public static ImageIcon getTestPassed() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/test_passed.png");
+	public static Icon getTestPassed() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/circle-check.svg");
 	}
 
-	public static ImageIcon getTestRunning() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/test_running.png");
+	public static Icon getTestRunning() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/loader.svg");
 	}
 
-	public static ImageIcon getTreeBundle() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/tree_bundle.png");
+	public static Icon getTreeBundle() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/folder.svg");
 	}
 
-	public static ImageIcon getTreeLeaf() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/tree_leaf.png");
+	public static Icon getTreeLeaf() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/file.svg");
 	}
 
-	public static ImageIcon getValFailed() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/val_failed.png");
+	public static Icon getValFailed() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/circle-x.svg");
 	}
 
 	public static Icon getValFailedChild() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/val_failed_child.png");
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/alert-circle.svg");
 	}
 
-	public static ImageIcon getValPassed() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/val_passed.png");
+	public static Icon getValPassed() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/circle-check.svg");
 	}
 
-	public static ImageIcon getValPassedGreen() {
-		return getImageIcon("ca/uhn/hl7v2/testpanel/images/val_passed_green.png");
+	public static Icon getValPassedGreen() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/circle-check.svg");
 	}
+
+	// -------------------------------------------------------------------------
+	// New methods
+	// -------------------------------------------------------------------------
+
+	public static Icon getAdd() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/plus.svg");
+	}
+
+	public static Icon getDelete() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/trash.svg");
+	}
+
+	public static Icon getClose() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/x.svg");
+	}
+
+	public static Icon getRename() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/pencil.svg");
+	}
+
+	public static Icon getSave() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/device-floppy.svg");
+	}
+
+	public static Icon getSaveAll() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/files.svg");
+	}
+
+	public static Icon getOpen() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/folder-open.svg");
+	}
+
+	public static Icon getStartOne() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/player-play.svg");
+	}
+
+	public static Icon getStartAll() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/player-play.svg");
+	}
+
+	public static Icon getStop() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/player-stop.svg");
+	}
+
+	public static Icon getStopAll() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/player-stop.svg");
+	}
+
+	public static Icon getClear() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/trash.svg");
+	}
+
+	public static Icon getEditOne() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/pencil.svg");
+	}
+
+	public static Icon getEditAll() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/edit.svg");
+	}
+
+	public static Icon getNewMessage() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/file-text.svg");
+	}
+
+	public static Icon getMoveTaskUp() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/arrow-up.svg");
+	}
+
+	public static Icon getMoveTaskDown() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/arrow-down.svg");
+	}
+
+	public static Icon getFollow() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/arrows-up-down.svg");
+	}
+
+	public static Icon getWrap() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/text-wrap.svg");
+	}
+
+	public static Icon getCollapseAll() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/fold.svg");
+	}
+
+	public static Icon getExpandAll() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/unfold.svg");
+	}
+
+	public static Icon getInfoOk() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/circle-check.svg");
+	}
+
+	public static Icon getInfoWarning() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/alert-triangle.svg");
+	}
+
+	public static Icon getInfoWorking() {
+		return getSVGIcon("ca/uhn/hl7v2/testpanel/icons/loader.svg");
+	}
+
 }

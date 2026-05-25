@@ -110,6 +110,7 @@ import ca.uhn.hl7v2.testpanel.ui.ActivityTable;
 import ca.uhn.hl7v2.testpanel.ui.BaseMainPanel;
 import ca.uhn.hl7v2.testpanel.ui.HoverButtonMouseAdapter;
 import ca.uhn.hl7v2.testpanel.ui.IDestroyable;
+import ca.uhn.hl7v2.testpanel.ui.ImageFactory;
 import ca.uhn.hl7v2.testpanel.ui.ShowEnum;
 import ca.uhn.hl7v2.testpanel.ui.TestPanelWindow;
 import ca.uhn.hl7v2.testpanel.ui.v2tree.Hl7V2MessageTree;
@@ -257,13 +258,13 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 			}
 		});
 
-		myFollowToggle.setIcon(new ImageIcon(Hl7V2MessageEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/updown.png")));
+		myFollowToggle.setIcon(ImageFactory.getFollow());
 		myFollowToggle.setSelected(theController.isMessageEditorInFollowMode());
 		toolBar.add(myFollowToggle);
 
 		myWrapToggle = new JToggleButton("Wrap");
 		myWrapToggle.setToolTipText("Toggle line wrapping in the message editor");
-		myWrapToggle.setIcon(new ImageIcon(Hl7V2MessageEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/wrap.png")));
+		myWrapToggle.setIcon(ImageFactory.getWrap());
 		myWrapToggle.setSelected(false);
 		myWrapToggle.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -362,7 +363,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 			}
 		});
 		collapseAllButton.setToolTipText("Collapse All");
-		collapseAllButton.setIcon(new ImageIcon(Hl7V2MessageEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/collapse_all.png")));
+		collapseAllButton.setIcon(ImageFactory.getCollapseAll());
 		mytoolBar_1.add(collapseAllButton);
 
 		expandAllButton = new JButton();
@@ -374,7 +375,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 			}
 		});
 		expandAllButton.setToolTipText("Expand All");
-		expandAllButton.setIcon(new ImageIcon(Hl7V2MessageEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/expand_all.png")));
+		expandAllButton.setIcon(ImageFactory.getExpandAll());
 		mytoolBar_1.add(expandAllButton);
 
 		myhorizontalGlue = Box.createHorizontalGlue();
@@ -430,7 +431,7 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 			}
 		});
 
-		mySendButton.setIcon(new ImageIcon(Hl7V2MessageEditorPanel.class.getResource("/ca/uhn/hl7v2/testpanel/images/button_execute.png")));
+		mySendButton.setIcon(ImageFactory.getButtonExecute());
 		mytoolBar.add(mySendButton);
 
 		myhorizontalStrut_1 = Box.createHorizontalStrut(15);

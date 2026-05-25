@@ -15,7 +15,6 @@ import java.util.Comparator;
 import java.util.List;
 
 import javax.swing.DefaultComboBoxModel;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
@@ -37,6 +36,7 @@ import org.apache.commons.lang.StringUtils;
 
 import ca.uhn.hl7v2.testpanel.controller.Hl7V2FileSortController;
 import ca.uhn.hl7v2.testpanel.controller.Prefs;
+import ca.uhn.hl7v2.testpanel.ui.ImageFactory;
 import ca.uhn.hl7v2.testpanel.util.Hl7V2MessageStringComparatorByControlId;
 import ca.uhn.hl7v2.testpanel.util.Hl7V2MessageStringComparatorByTimestamp;
 import ca.uhn.hl7v2.testpanel.util.IProgressCallback;
@@ -148,7 +148,7 @@ public class Hl7V2FileSortDialog extends JDialog {
 						chooseFile(textField);
 					}
 				});
-				myPickFile1Button.setIcon(new ImageIcon(Hl7V2FileSortDialog.class.getResource("/ca/uhn/hl7v2/testpanel/images/open.png")));
+				myPickFile1Button.setIcon(ImageFactory.getOpen());
 				GridBagConstraints gbc_PickFile1Button = new GridBagConstraints();
 				gbc_PickFile1Button.insets = new Insets(0, 0, 0, 5);
 				gbc_PickFile1Button.gridx = 2;
@@ -189,7 +189,7 @@ public class Hl7V2FileSortDialog extends JDialog {
 						chooseFile(myOutputFileText);
 					}
 				});
-				myPickFile2Button.setIcon(new ImageIcon(Hl7V2FileSortDialog.class.getResource("/ca/uhn/hl7v2/testpanel/images/open.png")));
+				myPickFile2Button.setIcon(ImageFactory.getOpen());
 				GridBagConstraints gbc_PickFile2Button = new GridBagConstraints();
 				gbc_PickFile2Button.gridx = 5;
 				gbc_PickFile2Button.gridy = 1;
@@ -217,7 +217,7 @@ public class Hl7V2FileSortDialog extends JDialog {
 					myController.begin();
 				}
 			});
-			myBeginButton.setIcon(new ImageIcon(Hl7V2FileSortDialog.class.getResource("/ca/uhn/hl7v2/testpanel/images/start_all.png")));
+			myBeginButton.setIcon(ImageFactory.getStartAll());
 			GridBagConstraints gbc_BeginButton = new GridBagConstraints();
 			gbc_BeginButton.anchor = GridBagConstraints.WEST;
 			gbc_BeginButton.insets = new Insets(0, 0, 0, 5);
@@ -232,7 +232,7 @@ public class Hl7V2FileSortDialog extends JDialog {
 						updateButtonStates();
 					}
 				});
-				myStopButton.setIcon(new ImageIcon(Hl7V2FileSortDialog.class.getResource("/ca/uhn/hl7v2/testpanel/images/stop_all.png")));
+				myStopButton.setIcon(ImageFactory.getStopAll());
 				GridBagConstraints gbc_StopButton = new GridBagConstraints();
 				gbc_StopButton.insets = new Insets(0, 0, 0, 5);
 				gbc_StopButton.gridx = 1;

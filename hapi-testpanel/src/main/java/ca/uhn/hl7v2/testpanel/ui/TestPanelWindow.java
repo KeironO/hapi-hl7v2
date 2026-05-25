@@ -55,6 +55,7 @@ import javax.swing.DefaultListCellRenderer;
 import javax.swing.UIManager;
 import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
+
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -436,7 +437,7 @@ public class TestPanelWindow implements IDestroyable {
 		});
 		myAddConnectionButton.setBorderPainted(false);
 		myAddConnectionButton.addMouseListener(new HoverButtonMouseAdapter(myAddConnectionButton));
-		myAddConnectionButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/add.png")));
+		myAddConnectionButton.setIcon(ImageFactory.getAdd());
 		toolBar.add(myAddConnectionButton);
 
 		myDeleteOutboundConnectionButton = new JButton("Delete");
@@ -449,7 +450,7 @@ public class TestPanelWindow implements IDestroyable {
 		});
 		myDeleteOutboundConnectionButton.setBorderPainted(false);
 		myDeleteOutboundConnectionButton.addMouseListener(new HoverButtonMouseAdapter(myDeleteOutboundConnectionButton));
-		myDeleteOutboundConnectionButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/delete.png")));
+		myDeleteOutboundConnectionButton.setIcon(ImageFactory.getDelete());
 		toolBar.add(myDeleteOutboundConnectionButton);
 
 		myStartOneOutboundButton = new JButton("Start");
@@ -461,13 +462,13 @@ public class TestPanelWindow implements IDestroyable {
 			}
 		});
 		myStartOneOutboundButton.setBorderPainted(false);
-		myStartOneOutboundButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/start_one.png")));
+		myStartOneOutboundButton.setIcon(ImageFactory.getStartOne());
 		myStartOneOutboundButton.addMouseListener(new HoverButtonMouseAdapter(myStartOneOutboundButton));
 		toolBar.add(myStartOneOutboundButton);
 
 		myStartAllOutboundButton = new JButton("Start All");
 		myStartAllOutboundButton.setBorderPainted(false);
-		myStartAllOutboundButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/start_all.png")));
+		myStartAllOutboundButton.setIcon(ImageFactory.getStartAll());
 		myStartAllOutboundButton.addMouseListener(new HoverButtonMouseAdapter(myStartAllOutboundButton));
 		myStartAllOutboundButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent theE) {
@@ -482,7 +483,7 @@ public class TestPanelWindow implements IDestroyable {
 				myController.stopAllOutboundConnections();
 			}
 		});
-		myStopAllOutboundButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/stop_all.png")));
+		myStopAllOutboundButton.setIcon(ImageFactory.getStopAll());
 		myStopAllOutboundButton.setBorderPainted(false);
 		myStopAllOutboundButton.addMouseListener(new HoverButtonMouseAdapter(myStopAllOutboundButton));
 		toolBar.add(myStopAllOutboundButton);
@@ -535,7 +536,7 @@ public class TestPanelWindow implements IDestroyable {
 				myController.addInboundConnection();
 			}
 		});
-		myAddInboundConnectionButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/add.png")));
+		myAddInboundConnectionButton.setIcon(ImageFactory.getAdd());
 		myAddInboundConnectionButton.setBorderPainted(false);
 		myAddInboundConnectionButton.addMouseListener(new HoverButtonMouseAdapter(myAddInboundConnectionButton));
 		toolBar_1.add(myAddInboundConnectionButton);
@@ -550,7 +551,7 @@ public class TestPanelWindow implements IDestroyable {
 		});
 		myDeleteInboundConnectionButton.setBorderPainted(false);
 		myDeleteInboundConnectionButton.addMouseListener(new HoverButtonMouseAdapter(myDeleteInboundConnectionButton));
-		myDeleteInboundConnectionButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/delete.png")));
+		myDeleteInboundConnectionButton.setIcon(ImageFactory.getDelete());
 		toolBar_1.add(myDeleteInboundConnectionButton);
 
 		myStartOneInboundButton = new JButton("Start");
@@ -562,14 +563,14 @@ public class TestPanelWindow implements IDestroyable {
 			}
 		});
 		myStartOneInboundButton.setBorderPainted(false);
-		myStartOneInboundButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/start_one.png")));
+		myStartOneInboundButton.setIcon(ImageFactory.getStartOne());
 		myStartOneInboundButton.addMouseListener(new HoverButtonMouseAdapter(myStartOneInboundButton));
 		toolBar_1.add(myStartOneInboundButton);
 		
 		myStartAllInboundButton = new JButton("");
 		myStartAllInboundButton.setBorderPainted(false);
 		myStartAllInboundButton.setText("Start All");
-		myStartAllInboundButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/start_all.png")));
+		myStartAllInboundButton.setIcon(ImageFactory.getStartAll());
 		myStartAllInboundButton.addMouseListener(new HoverButtonMouseAdapter(myStartAllInboundButton));
 		myStartAllInboundButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent theE) {
@@ -584,7 +585,7 @@ public class TestPanelWindow implements IDestroyable {
 				myController.stopAllInboundConnections();
 			}
 		});
-		myStopAllInboundButton.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/stop_all.png")));
+		myStopAllInboundButton.setIcon(ImageFactory.getStopAll());
 		myStopAllInboundButton.setBorderPainted(false);
 		myStopAllInboundButton.addMouseListener(new HoverButtonMouseAdapter(myStopAllInboundButton));
 		toolBar_1.add(myStopAllInboundButton);
@@ -826,7 +827,7 @@ public class TestPanelWindow implements IDestroyable {
 		fileMenu.addSeparator();
 
 		JMenuItem newMessageMenuItem = new JMenuItem("New Message...");
-		newMessageMenuItem.setIcon(new ImageIcon(TestPanelWindow.class.getResource("/ca/uhn/hl7v2/testpanel/images/message_hl7.png")));
+		newMessageMenuItem.setIcon(ImageFactory.getNewMessage());
 		newMessageMenuItem.addActionListener(e -> myController.addMessage());
 		fileMenu.add(newMessageMenuItem);
 
