@@ -27,10 +27,15 @@ package ca.uhn.hl7v2.testpanel.controller;
 
 import static org.apache.commons.lang.StringUtils.*;
 
+import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.awt.Frame;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.beans.PropertyVetoException;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -46,12 +51,15 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.filechooser.FileFilter;
@@ -81,10 +89,13 @@ import ca.uhn.hl7v2.testpanel.model.msg.Hl7V2MessageCollection;
 import ca.uhn.hl7v2.testpanel.model.msg.Hl7V2MessageEr7;
 import ca.uhn.hl7v2.testpanel.model.msg.Hl7V2MessageXml;
 import ca.uhn.hl7v2.testpanel.ui.AddMessageDialog;
+import ca.uhn.hl7v2.testpanel.ui.BaseMainPanel;
 import ca.uhn.hl7v2.testpanel.ui.FileChooserOpenAccessory;
 import ca.uhn.hl7v2.testpanel.ui.FileChooserSaveAccessory;
+import ca.uhn.hl7v2.testpanel.ui.IDestroyable;
 import ca.uhn.hl7v2.testpanel.ui.NothingSelectedPanel;
 import ca.uhn.hl7v2.testpanel.ui.TestPanelWindow;
+import ca.uhn.hl7v2.testpanel.ui.conn.CreateInboundConnectionDialog;
 import ca.uhn.hl7v2.testpanel.ui.conn.CreateOutboundConnectionDialog;
 import ca.uhn.hl7v2.testpanel.ui.conn.InboundConnectionPanel;
 import ca.uhn.hl7v2.testpanel.ui.conn.OutboundConnectionPanel;
@@ -109,6 +120,7 @@ public class Controller {
 	private InboundConnectionList myInboundConnectionList;
 	private WorkspaceController myWorkspaceController;
 	private Object myLeftSelectedItem;
+	private Map<String, ConnectionWindowHandle> myOpenConnectionWindows = new HashMap<>();
 	private boolean myMessageEditorInFollowMode = true;
 	private MessagesList myMessagesList;
 	private Object myNothingSelectedMarker = new Object();
@@ -172,10 +184,20 @@ public class Controller {
 	}
 
 	public void addInboundConnection() {
-		InboundConnection con = myInboundConnectionList.createDefaultConnection(provideRandomPort());
+		final InboundConnection con = myInboundConnectionList.createDefaultConnection(provideRandomPort());
 
-		setLeftSelectedItem(con);
-		myInboundConnectionList.addConnection(con);
+		CreateInboundConnectionDialog dialog = new CreateInboundConnectionDialog(this, con, new IOkCancelCallback<InboundConnection>() {
+			public void ok(InboundConnection theArg) {
+				myInboundConnectionList.addConnection(theArg);
+				setLeftSelectedItem(theArg);
+			}
+
+			public void cancel(InboundConnection theArg) {
+				// discarded
+			}
+		});
+		dialog.setLocationRelativeTo(myView.getFrame());
+		dialog.setVisible(true);
 	}
 
 	public void addMessage() {
@@ -226,10 +248,20 @@ public class Controller {
 	}
 
 	public void addOutboundConnection() {
-		OutboundConnection con = myOutboundConnectionList.createDefaultConnection(provideRandomPort());
+		final OutboundConnection con = myOutboundConnectionList.createDefaultConnection(provideRandomPort());
 
-		setLeftSelectedItem(con);
-		myOutboundConnectionList.addConnection(con);
+		CreateOutboundConnectionDialog dialog = new CreateOutboundConnectionDialog(this, con, new IOkCancelCallback<OutboundConnection>() {
+			public void ok(OutboundConnection theArg) {
+				myOutboundConnectionList.addConnection(theArg);
+				setLeftSelectedItem(theArg);
+			}
+
+			public void cancel(OutboundConnection theArg) {
+				// discarded
+			}
+		});
+		dialog.setLocationRelativeTo(myView.getFrame());
+		dialog.setVisible(true);
 	}
 
 	public void addOutboundConnectionToSendTo(final IOkCancelCallback<OutboundConnection> theHandler) {
@@ -659,6 +691,8 @@ public class Controller {
 	}
 
 	public void removeInboundConnection(InboundConnection theConnection) {
+		ConnectionWindowHandle handle = myOpenConnectionWindows.remove(theConnection.getId());
+		if (handle != null) handle.close();
 		myInboundConnectionList.removeConnecion(theConnection);
 		if (myInboundConnectionList.getConnections().size() > 0) {
 			setLeftSelectedItem(myInboundConnectionList.getConnections().get(0));
@@ -668,6 +702,8 @@ public class Controller {
 	}
 
 	public void removeOutboundConnection(OutboundConnection theConnection) {
+		ConnectionWindowHandle handle = myOpenConnectionWindows.remove(theConnection.getId());
+		if (handle != null) handle.close();
 		myOutboundConnectionList.removeConnecion(theConnection);
 		if (myOutboundConnectionList.getConnections().size() > 0) {
 			setLeftSelectedItem(myOutboundConnectionList.getConnections().get(0));
@@ -832,32 +868,35 @@ public class Controller {
 	}
 
 	public void setLeftSelectedItem(Object theSelectedValue) {
+		// Connections open in their own floating window. Handle before the identity
+		// check so re-clicking an already-selected connection brings its window to front.
+		if (theSelectedValue instanceof OutboundConnection) {
+			OutboundConnection connection = (OutboundConnection) theSelectedValue;
+			openOrFocusConnectionWindow(connection);
+			myLeftSelectedItem = connection;
+			Prefs.getInstance().setMostRecentlySelectedItemId(connection.getId());
+			return;
+		} else if (theSelectedValue instanceof InboundConnection) {
+			InboundConnection connection = (InboundConnection) theSelectedValue;
+			openOrFocusConnectionWindow(connection);
+			myLeftSelectedItem = connection;
+			Prefs.getInstance().setMostRecentlySelectedItemId(connection.getId());
+			return;
+		}
+
 		if (myLeftSelectedItem == theSelectedValue) {
 			return;
 		}
 
 		String id = null;
-
 		myLeftSelectedItem = theSelectedValue;
+
 		if (myLeftSelectedItem instanceof Hl7V2MessageCollection) {
 			Hl7V2MessageEditorPanel hl7v2MessageEditorPanel = new Hl7V2MessageEditorPanel(this);
 			Hl7V2MessageCollection collection = (Hl7V2MessageCollection) myLeftSelectedItem;
 			hl7v2MessageEditorPanel.setMessage(collection);
 			myView.setMainPanel(hl7v2MessageEditorPanel);
 			id = collection.getId();
-		} else if (myLeftSelectedItem instanceof OutboundConnection) {
-			OutboundConnectionPanel panel = new OutboundConnectionPanel(this);
-			panel.setController(this);
-			OutboundConnection connection = (OutboundConnection) myLeftSelectedItem;
-			panel.setConnection(connection);
-			id = connection.getId();
-			myView.setMainPanel(panel);
-		} else if (myLeftSelectedItem instanceof InboundConnection) {
-			InboundConnectionPanel panel = new InboundConnectionPanel(this);
-			InboundConnection connection = (InboundConnection) myLeftSelectedItem;
-			panel.setConnection(connection);
-			myView.setMainPanel(panel);
-			id = connection.getId();
 		} else if (myLeftSelectedItem == myNothingSelectedMarker) {
 			myView.setMainPanel(new NothingSelectedPanel(this));
 		}
@@ -865,6 +904,72 @@ public class Controller {
 		if (id != null) {
 			Prefs.getInstance().setMostRecentlySelectedItemId(id);
 		}
+	}
+
+	public void selectConnectionWithoutOpening(Object connection) {
+		myLeftSelectedItem = connection;
+		String id = connection instanceof OutboundConnection
+				? ((OutboundConnection) connection).getId()
+				: ((InboundConnection) connection).getId();
+		Prefs.getInstance().setMostRecentlySelectedItemId(id);
+	}
+
+	private void openOrFocusConnectionWindow(Object connection) {
+		String id = connection instanceof OutboundConnection
+				? ((OutboundConnection) connection).getId()
+				: ((InboundConnection) connection).getId();
+
+		ConnectionWindowHandle existing = myOpenConnectionWindows.get(id);
+		if (existing != null && existing.window.isDisplayable()) {
+			existing.window.toFront();
+			existing.window.requestFocus();
+			return;
+		}
+
+		BaseMainPanel panel;
+		IDestroyable destroyable;
+
+		if (connection instanceof OutboundConnection) {
+			OutboundConnectionPanel outPanel = new OutboundConnectionPanel(this);
+			outPanel.setController(this);
+			outPanel.setConnection((OutboundConnection) connection);
+			panel = outPanel;
+			destroyable = outPanel;
+		} else {
+			InboundConnectionPanel inPanel = new InboundConnectionPanel(this);
+			inPanel.setConnection((InboundConnection) connection);
+			panel = inPanel;
+			destroyable = inPanel;
+		}
+
+		JDialog window = buildConnectionWindow(panel, destroyable, id);
+		myOpenConnectionWindows.put(id, new ConnectionWindowHandle(window, destroyable));
+		window.setLocationRelativeTo(myView.getFrame());
+		window.setVisible(true);
+	}
+
+	private JDialog buildConnectionWindow(BaseMainPanel panel, IDestroyable destroyable, String id) {
+		JDialog window = new JDialog(myView.getFrame(), false);
+		String title = panel.getWindowTitle();
+		window.setTitle(title != null ? title : "Connection");
+		panel.addPropertyChangeListener(BaseMainPanel.PROP_WINDOWTITLE, new PropertyChangeListener() {
+			public void propertyChange(PropertyChangeEvent e) {
+				window.setTitle((String) e.getNewValue());
+			}
+		});
+		window.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+		window.addWindowListener(new WindowAdapter() {
+			@Override
+			public void windowClosing(WindowEvent e) {
+				destroyable.destroy();
+				myOpenConnectionWindows.remove(id);
+				window.dispose();
+			}
+		});
+		window.getContentPane().setLayout(new BorderLayout());
+		window.getContentPane().add(panel, BorderLayout.CENTER);
+		window.setSize(750, 560);
+		return window;
 	}
 
 	/**
@@ -1228,6 +1333,21 @@ public class Controller {
 			}
 		}
 
+	}
+
+	private static class ConnectionWindowHandle {
+		final JDialog window;
+		final IDestroyable destroyable;
+
+		ConnectionWindowHandle(JDialog window, IDestroyable destroyable) {
+			this.window = window;
+			this.destroyable = destroyable;
+		}
+
+		void close() {
+			destroyable.destroy();
+			window.dispose();
+		}
 	}
 
 }

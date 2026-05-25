@@ -45,6 +45,7 @@ import ca.uhn.hl7v2.testpanel.util.IOkCancelCallback;
 public class CreateOutboundConnectionDialog extends JDialog implements IDestroyable {
 
 	private Hl7ConnectionPanel myConnectionPanel;
+	private Hl7ConnectionPanelHeader myHeaderPanel;
 	private final JPanel mycontentPanel = new JPanel();
 	private boolean myDone;
 	private Controller myController;
@@ -66,48 +67,48 @@ public class CreateOutboundConnectionDialog extends JDialog implements IDestroya
 			}
 		});
 		setModal(true);
-		setBounds(100, 100, 687, 397);
+		setTitle("New Sending Connection");
+		setBounds(100, 100, 687, 480);
 		getContentPane().setLayout(new BorderLayout());
+
+		myHeaderPanel = new Hl7ConnectionPanelHeader();
+		myHeaderPanel.setConnection(theConnection);
+		myHeaderPanel.markDisableStartingAndStopping();
+		getContentPane().add(myHeaderPanel, BorderLayout.NORTH);
+
 		mycontentPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
 		getContentPane().add(mycontentPanel, BorderLayout.CENTER);
 		mycontentPanel.setLayout(new BorderLayout(0, 0));
-		{
-			JPanel buttonPane = new JPanel();
-			buttonPane.setLayout(new FlowLayout(FlowLayout.RIGHT));
-			getContentPane().add(buttonPane, BorderLayout.SOUTH);
-			{
-				JButton okButton = new JButton("OK");
-				okButton.addActionListener(new ActionListener() {
 
-					public void actionPerformed(ActionEvent e) {
-						theHandler.ok(theConnection);
-						myDone = true;
-						setVisible(false);
-					}
-				});
-				okButton.setActionCommand("OK");
-				buttonPane.add(okButton);
-				getRootPane().setDefaultButton(okButton);
+		JPanel buttonPane = new JPanel();
+		buttonPane.setLayout(new FlowLayout(FlowLayout.RIGHT));
+		getContentPane().add(buttonPane, BorderLayout.SOUTH);
+
+		JButton okButton = new JButton("OK");
+		okButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				theHandler.ok(theConnection);
+				myDone = true;
+				setVisible(false);
 			}
-			{
-				JButton cancelButton = new JButton("Cancel");
-				cancelButton.addActionListener(new ActionListener() {
-					public void actionPerformed(ActionEvent e) {
-						theHandler.cancel(theConnection);
-						myDone = true;
-						setVisible(false);
-					}
-				});
-				cancelButton.setActionCommand("Cancel");
-				buttonPane.add(cancelButton);
+		});
+		okButton.setActionCommand("OK");
+		buttonPane.add(okButton);
+		getRootPane().setDefaultButton(okButton);
+
+		JButton cancelButton = new JButton("Cancel");
+		cancelButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				theHandler.cancel(theConnection);
+				myDone = true;
+				setVisible(false);
 			}
-		}
+		});
+		cancelButton.setActionCommand("Cancel");
+		buttonPane.add(cancelButton);
 
 		myConnectionPanel = new Hl7ConnectionPanel(myController);
 		myConnectionPanel.setConnection(theConnection);
-//		myConnectionPanel.markDisableStartingAndStopping();
-//		myConnectionPanel.setLabelText("Create a new connection to send messages to");
-
 		mycontentPanel.add(myConnectionPanel, BorderLayout.CENTER);
 
 	}

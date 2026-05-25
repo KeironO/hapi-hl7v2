@@ -1,34 +1,8 @@
-/**
- * The contents of this file are subject to the Mozilla Public License Version 1.1
- * (the "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at http://www.mozilla.org/MPL/
- * Software distributed under the License is distributed on an "AS IS" basis,
- * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for the
- * specific language governing rights and limitations under the License.
- *
- * The Original Code is ""  Description:
- * ""
- *
- * The Initial Developer of the Original Code is University Health Network. Copyright (C)
- * 2001.  All Rights Reserved.
- *
- * Contributor(s): ______________________________________.
- *
- * Alternatively, the contents of this file may be used under the terms of the
- * GNU General Public License (the  "GPL"), in which case the provisions of the GPL are
- * applicable instead of those above.  If you wish to allow use of your version of this
- * file only under the terms of the GPL and not to allow others to use your version
- * of this file under the MPL, indicate your decision by deleting  the provisions above
- * and replace  them with the notice and other provisions required by the GPL License.
- * If you do not delete the provisions above, a recipient may use your version of
- * this file under either the MPL or the GPL.
- */
 package ca.uhn.hl7v2.testpanel.ui.conn;
 
 import java.awt.BorderLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
+import java.awt.Color;
+import java.awt.Font;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyVetoException;
@@ -37,6 +11,7 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.swing.BorderFactory;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -44,6 +19,7 @@ import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.UIManager;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.TableModel;
@@ -72,76 +48,75 @@ public class InboundConnectionPanel extends BaseMainPanel implements IDestroyabl
 	private ValidationHeaderPanel myValidationPanel;
 	private VetoableChangeListener myNewMessagesPropertyListener;
 
-	/**
-	 * Create the panel.
-	 * 
-	 * @param theController
-	 */
 	public InboundConnectionPanel(Controller theController) {
-		GridBagLayout gridBagLayout = new GridBagLayout();
-		gridBagLayout.columnWidths = new int[] { 559, 0 };
-		gridBagLayout.rowHeights = new int[] { 0, 0, 315, 0 };
-		gridBagLayout.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
-		gridBagLayout.rowWeights = new double[] { 0.0, 0.0, 1.0, Double.MIN_VALUE };
-		setLayout(gridBagLayout);
+		setLayout(new BorderLayout(0, 0));
+
+		// ── Top: header + validation ───────────────────────────────────────────
+		JPanel topPanel = new JPanel(new BorderLayout(0, 0));
+		topPanel.setOpaque(false);
 
 		myHeaderPanel = new Hl7ConnectionPanelHeader();
-		GridBagConstraints gbc_panel_2 = new GridBagConstraints();
-		gbc_panel_2.insets = new Insets(0, 0, 5, 0);
-		gbc_panel_2.fill = GridBagConstraints.BOTH;
-		gbc_panel_2.gridx = 0;
-		gbc_panel_2.gridy = 0;
-		add(myHeaderPanel, gbc_panel_2);
+		topPanel.add(myHeaderPanel, BorderLayout.NORTH);
 
 		myValidationPanel = new ValidationHeaderPanel(theController);
-		GridBagConstraints gbc_ValidationPanel = new GridBagConstraints();
-		gbc_ValidationPanel.insets = new Insets(0, 0, 5, 0);
-		gbc_ValidationPanel.fill = GridBagConstraints.BOTH;
-		gbc_ValidationPanel.gridx = 0;
-		gbc_ValidationPanel.gridy = 1;
-		add(myValidationPanel, gbc_ValidationPanel);
+		topPanel.add(myValidationPanel, BorderLayout.CENTER);
 
+		add(topPanel, BorderLayout.NORTH);
+
+		// ── Centre: tabbed content ─────────────────────────────────────────────
 		myTabbedPane = new JTabbedPane(JTabbedPane.TOP);
-		GridBagConstraints gbc_TabbedPane = new GridBagConstraints();
-		gbc_TabbedPane.fill = GridBagConstraints.BOTH;
-		gbc_TabbedPane.gridx = 0;
-		gbc_TabbedPane.gridy = 2;
-		add(myTabbedPane, gbc_TabbedPane);
+		myTabbedPane.setBorder(BorderFactory.createEmptyBorder(4, 0, 0, 0));
+		add(myTabbedPane, BorderLayout.CENTER);
+
+		// Settings tab
 		mySettingPanelTab = new Hl7ConnectionPanel(theController);
-		myTabbedPane.addTab("Settings", null, mySettingPanelTab, null);
 		mySettingPanelTab.setBorder(null);
+		myTabbedPane.addTab("Settings", mySettingPanelTab);
 
-		myActivitySplitPaneTab = new JSplitPane();
-		myTabbedPane.addTab("Activity", null, myActivitySplitPaneTab, null);
+		// Activity tab
+		myActivitySplitPaneTab = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
 		myActivitySplitPaneTab.setResizeWeight(0.3);
+		myActivitySplitPaneTab.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+		myTabbedPane.addTab("Activity", myActivitySplitPaneTab);
 
-		JPanel panel_1 = new JPanel();
-		myActivitySplitPaneTab.setLeftComponent(panel_1);
-		panel_1.setLayout(new BorderLayout(0, 0));
-
-		JLabel lblConnections = new JLabel("Connections");
-		panel_1.add(lblConnections, BorderLayout.NORTH);
-
-		JScrollPane scrollPane = new JScrollPane();
-		panel_1.add(scrollPane, BorderLayout.CENTER);
+		// Left: connected clients
+		JPanel connectionsPanel = new JPanel(new BorderLayout(0, 4));
+		connectionsPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 4));
+		connectionsPanel.setOpaque(false);
+		connectionsPanel.add(sectionLabel("Connections"), BorderLayout.NORTH);
 
 		myConnectionsTableModel = new ConnectionsTableModel();
-		myConnectionsTable = new JTable();
-		myConnectionsTable.setModel(myConnectionsTableModel);
-		scrollPane.setViewportView(myConnectionsTable);
+		myConnectionsTable = new JTable(myConnectionsTableModel);
+		myConnectionsTable.setFillsViewportHeight(true);
+		JScrollPane connectionsScroll = new JScrollPane(myConnectionsTable);
+		connectionsScroll.setBorder(BorderFactory.createLineBorder(
+				UIManager.getColor("Separator.foreground") != null
+						? UIManager.getColor("Separator.foreground")
+						: new Color(0xD1, 0xD5, 0xDB)));
+		connectionsPanel.add(connectionsScroll, BorderLayout.CENTER);
+		myActivitySplitPaneTab.setLeftComponent(connectionsPanel);
 
-		JPanel panel = new JPanel();
-		myActivitySplitPaneTab.setRightComponent(panel);
-		panel.setLayout(new BorderLayout(0, 0));
-
-		JLabel lblActivity = new JLabel("Activity");
-		panel.add(lblActivity, BorderLayout.NORTH);
+		// Right: activity log
+		JPanel activityPanel = new JPanel(new BorderLayout(0, 4));
+		activityPanel.setOpaque(false);
+		activityPanel.add(sectionLabel("Activity"), BorderLayout.NORTH);
 
 		myActivityTable = new ActivityTable();
 		myActivityTable.getScrollPane().setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 		myActivityTable.getScrollPane().setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
 		myActivityTable.setController(theController);
-		panel.add(myActivityTable, BorderLayout.CENTER);
+		activityPanel.add(myActivityTable, BorderLayout.CENTER);
+		myActivitySplitPaneTab.setRightComponent(activityPanel);
+	}
+
+	private static JLabel sectionLabel(String text) {
+		JLabel label = new JLabel(text);
+		label.setFont(label.getFont().deriveFont(Font.BOLD, 11f));
+		label.setForeground(UIManager.getColor("Label.disabledForeground") != null
+				? UIManager.getColor("Label.disabledForeground")
+				: new Color(0x6B, 0x72, 0x80));
+		label.setBorder(BorderFactory.createEmptyBorder(0, 0, 4, 0));
+		return label;
 	}
 
 	public void destroy() {
@@ -165,10 +140,6 @@ public class InboundConnectionPanel extends BaseMainPanel implements IDestroyabl
 		theConnection.clearNewMessages();
 		myNewMessagesPropertyListener = new VetoableChangeListener() {
 			public void vetoableChange(PropertyChangeEvent theEvt) throws PropertyVetoException {
-				/*
-				 * This window displays messages as they arrive, so the message model
-				 * object doesn't need to accumulate the count
-				 */
 				if (theEvt.getPropertyName() == AbstractConnection.NEW_MESSAGES_PROPERTY) {
 					Integer oldValue = (Integer) theEvt.getOldValue();
 					Integer newValue = (Integer) theEvt.getNewValue();
@@ -179,7 +150,6 @@ public class InboundConnectionPanel extends BaseMainPanel implements IDestroyabl
 			}
 		};
 		myConnection.addVetoableyChangeListener(AbstractConnection.NEW_MESSAGES_PROPERTY, myNewMessagesPropertyListener);
-		
 
 		myConnectionsListener = new PropertyChangeListener() {
 			public void propertyChange(PropertyChangeEvent theEvt) {
@@ -197,19 +167,19 @@ public class InboundConnectionPanel extends BaseMainPanel implements IDestroyabl
 		theConnection.addPropertyChangeListener(InboundConnection.NAME_PROPERTY, myNameListener);
 		updateWindowTitle();
 
-		if (theConnection.getStatus() == StatusEnum.STARTED || theConnection.getStatus() == StatusEnum.TRYING_TO_START) {
-			myTabbedPane.setSelectedIndex(1);
-		} else {
-			myTabbedPane.setSelectedIndex(0);
-		}
+		myTabbedPane.setSelectedIndex(
+				theConnection.getStatus() == StatusEnum.STARTED
+						|| theConnection.getStatus() == StatusEnum.TRYING_TO_START ? 1 : 0);
 
 		myStatusPropertyChangeListener = new PropertyChangeListener() {
 			public void propertyChange(PropertyChangeEvent theEvt) {
 				StatusEnum oldVal = (StatusEnum) theEvt.getOldValue();
 				StatusEnum newVal = (StatusEnum) theEvt.getNewValue();
-				if (oldVal == StatusEnum.STOPPED && (newVal == StatusEnum.TRYING_TO_START || newVal == StatusEnum.STARTED)) {
+				if (oldVal == StatusEnum.STOPPED
+						&& (newVal == StatusEnum.TRYING_TO_START || newVal == StatusEnum.STARTED)) {
 					myTabbedPane.setSelectedIndex(1);
-				} else if ((oldVal == StatusEnum.TRYING_TO_START || oldVal == StatusEnum.STARTED) && newVal == StatusEnum.STOPPED) {
+				} else if ((oldVal == StatusEnum.TRYING_TO_START || oldVal == StatusEnum.STARTED)
+						&& newVal == StatusEnum.STOPPED) {
 					myTabbedPane.setSelectedIndex(0);
 				}
 			}
@@ -224,9 +194,6 @@ public class InboundConnectionPanel extends BaseMainPanel implements IDestroyabl
 	private class ConnectionsTableModel implements TableModel {
 
 		private List<TableModelListener> myTableListeners = new ArrayList<TableModelListener>();
-
-		public ConnectionsTableModel() {
-		}
 
 		public void addTableModelListener(TableModelListener theL) {
 			myTableListeners.add(theL);
@@ -245,7 +212,7 @@ public class InboundConnectionPanel extends BaseMainPanel implements IDestroyabl
 		}
 
 		public int getRowCount() {
-			return myConnection.getConnections().size();
+			return myConnection != null ? myConnection.getConnections().size() : 0;
 		}
 
 		public Object getValueAt(int theRowIndex, int theColumnIndex) {
@@ -268,11 +235,9 @@ public class InboundConnectionPanel extends BaseMainPanel implements IDestroyabl
 
 		public void update() {
 			for (TableModelListener next : myTableListeners) {
-				TableModelEvent event = new TableModelEvent(this);
-				next.tableChanged(event);
+				next.tableChanged(new TableModelEvent(this));
 			}
 		}
-
 	}
 
 }

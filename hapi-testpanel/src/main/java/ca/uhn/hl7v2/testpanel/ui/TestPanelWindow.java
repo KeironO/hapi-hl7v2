@@ -25,19 +25,8 @@
  */
 package ca.uhn.hl7v2.testpanel.ui;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
+import java.awt.*;
 import java.io.File;
-import java.awt.Frame;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Image;
-import java.awt.Insets;
-import java.awt.Point;
-import java.awt.Rectangle;
-import java.awt.Toolkit;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.ActionEvent;
@@ -503,12 +492,23 @@ public class TestPanelWindow implements IDestroyable {
 			public void valueChanged(ListSelectionEvent e) {
 				if (myOutboundConnectionsList.getSelectedIndex() >= 0) {
 					ourLog.debug("New outbound connection selection " + myOutboundConnectionsList.getSelectedIndex());
-					myController.setLeftSelectedItem(myOutboundConnectionsList.getSelectedValue());
+					myController.selectConnectionWithoutOpening(myOutboundConnectionsList.getSelectedValue());
 					myMessagesTabPane.repaint();
 					myInboundConnectionsList.clearSelection();
 					myInboundConnectionsList.repaint();
 				}
 				updateLeftToolbarButtons();
+			}
+		});
+		myOutboundConnectionsList.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseClicked(MouseEvent e) {
+				if (e.getClickCount() == 2) {
+					int index = myOutboundConnectionsList.locationToIndex(e.getPoint());
+					if (index >= 0) {
+						myController.setLeftSelectedItem(myOutboundConnectionsList.getModel().getElementAt(index));
+					}
+				}
 			}
 		});
 		scrollPane.setViewportView(myOutboundConnectionsList);
@@ -604,13 +604,24 @@ public class TestPanelWindow implements IDestroyable {
 			public void valueChanged(ListSelectionEvent e) {
 				if (myInboundConnectionsList.getSelectedIndex() >= 0) {
 					ourLog.debug("New inbound connection selection " + myInboundConnectionsList.getSelectedIndex());
-					myController.setLeftSelectedItem(myInboundConnectionsList.getSelectedValue());
+					myController.selectConnectionWithoutOpening(myInboundConnectionsList.getSelectedValue());
 					myMessagesTabPane.repaint();
 					myOutboundConnectionsList.clearSelection();
 					myOutboundConnectionsList.repaint();
 					myInboundConnectionsList.repaint();
 				}
 				updateLeftToolbarButtons();
+			}
+		});
+		myInboundConnectionsList.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseClicked(MouseEvent e) {
+				if (e.getClickCount() == 2) {
+					int index = myInboundConnectionsList.locationToIndex(e.getPoint());
+					if (index >= 0) {
+						myController.setLeftSelectedItem(myInboundConnectionsList.getModel().getElementAt(index));
+					}
+				}
 			}
 		});
 		scrollPane_1.setViewportView(myInboundConnectionsList);
@@ -695,9 +706,12 @@ public class TestPanelWindow implements IDestroyable {
 
 		// Add resizable connections pane to the bottom with a split divider
 		JSplitPane editorSplitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, myEditorContentPanel, myConnectionsTabPane);
-		editorSplitPane.setDividerLocation(0.85);
+		editorSplitPane.setResizeWeight(0.7);
 		editorSplitPane.setOneTouchExpandable(false);
 		editorSplitPane.setBorder(null);
+		// setDividerLocation(double) only works after the pane has a real size,
+		// so defer it until after the window is shown.
+		EventQueue.invokeLater(() -> editorSplitPane.setDividerLocation(0.7));
 		centerPanel.add(editorSplitPane, BorderLayout.CENTER);
 
 		updateLogScrollPaneVisibility();
@@ -1202,9 +1216,16 @@ public class TestPanelWindow implements IDestroyable {
 
 	private static final Logger ourLog = LoggerFactory.getLogger(TestPanelWindow.class);
 	private static Color listSelectedBackground() {
-		Color bg = UIManager.getColor("List.background");
-		if (bg == null) bg = Color.WHITE;
-		return new Color(Math.max(0, bg.getRed() - 20), Math.max(0, bg.getGreen() - 20), Math.min(255, bg.getBlue() + 45));
+		if (App.isCurrentlyDark()) {
+			Color sel = UIManager.getColor("List.selectionBackground");
+			return sel != null ? sel : new Color(60, 90, 140);
+		}
+		return new Color(0xDB, 0xEA, 0xFE); // blue-100 equivalent, readable in light mode
+	}
+
+	private static Color listForeground() {
+		Color fg = UIManager.getColor("List.foreground");
+		return fg != null ? fg : Color.BLACK;
 	}
 	private JPanel myWorkspacePanel;
 	private JPanel myEditorContentPanel;
@@ -1252,7 +1273,7 @@ public class TestPanelWindow implements IDestroyable {
 		 */
 		@Override
 		public Component getListCellRendererComponent(JList theList, Object theValue, int theIndex, boolean theIsSelected, boolean theCellHasFocus) {
-			super.getListCellRendererComponent(theList, theValue, theIndex, theIsSelected, theCellHasFocus);
+			super.getListCellRendererComponent(theList, theValue, theIndex, false, false);
 			OutboundConnection obj = (OutboundConnection) theValue;
 			switch (obj.getStatus()) {
 			case STARTED:
@@ -1273,12 +1294,12 @@ public class TestPanelWindow implements IDestroyable {
 			boolean html = false;
 
 			if (!obj.isPersistent()) {
-				b.insert(0, "<font color=\\\"red\\\" size=\\\"2\\\">temp</font> ");
+				b.insert(0, "<font color=\"red\" size=\"2\">temp</font> ");
 				html = true;
 			}
 
 			if (obj.getNewMessages() > 0) {
-				b.append(" - <font color=\\\"red\\\">").append(obj.getNewMessages()).append(" new</font> ");
+				b.append(" - <font color=\"red\">").append(obj.getNewMessages()).append(" new</font> ");
 				html = true;
 			}
 
@@ -1288,7 +1309,7 @@ public class TestPanelWindow implements IDestroyable {
 			}
 
 			if (html) {
-				setText("<html><nobr>" + b.toString()+"</nobr></html>");
+				setText("<html><nobr>" + b.toString() + "</nobr></html>");
 			} else {
 				setText(b.toString());
 			}
@@ -1299,6 +1320,7 @@ public class TestPanelWindow implements IDestroyable {
 				Color bg = UIManager.getColor("List.background");
 				setBackground(bg != null ? bg : Color.WHITE);
 			}
+			setForeground(listForeground());
 
 			return this;
 		}
@@ -1316,7 +1338,7 @@ public class TestPanelWindow implements IDestroyable {
 		 */
 		@Override
 		public Component getListCellRendererComponent(JList theList, Object theValue, int theIndex, boolean theIsSelected, boolean theCellHasFocus) {
-			super.getListCellRendererComponent(theList, theValue, theIndex, theIsSelected, theCellHasFocus);
+			super.getListCellRendererComponent(theList, theValue, theIndex, false, false);
 			InboundConnection obj = (InboundConnection) theValue;
 			switch (obj.getStatus()) {
 			case STARTED:
@@ -1352,7 +1374,7 @@ public class TestPanelWindow implements IDestroyable {
 			}
 
 			if (html) {
-				setText("<html><nobr>" + b.toString()+"</nobr></html>");
+				setText("<html><nobr>" + b.toString() + "</nobr></html>");
 			} else {
 				setText(b.toString());
 			}
@@ -1363,6 +1385,7 @@ public class TestPanelWindow implements IDestroyable {
 				Color bg = UIManager.getColor("List.background");
 				setBackground(bg != null ? bg : Color.WHITE);
 			}
+			setForeground(listForeground());
 
 			return this;
 		}
