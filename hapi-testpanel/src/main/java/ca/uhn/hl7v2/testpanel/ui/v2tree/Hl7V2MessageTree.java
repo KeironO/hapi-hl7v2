@@ -93,6 +93,7 @@ import ca.uhn.hl7v2.testpanel.model.msg.Hl7V2MessageCollection;
 import ca.uhn.hl7v2.testpanel.ui.IDestroyable;
 import ca.uhn.hl7v2.testpanel.ui.ImageFactory;
 import ca.uhn.hl7v2.testpanel.ui.ShowEnum;
+import ca.uhn.hl7v2.testpanel.util.FieldTooltipBuilder;
 import ca.uhn.hl7v2.testpanel.util.SegmentAndComponentPath;
 import ca.uhn.hl7v2.util.StringUtil;
 import ca.uhn.hl7v2.validation.PrimitiveTypeRule;
@@ -153,6 +154,7 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		myTree.setRootVisible(false);
 		myTree.setRowHeight(20);
 		myTree.setCellRenderer(new Hl7TreeCellRenderer());
+		ToolTipManager.sharedInstance().registerComponent(myTree);
 		myTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
 		myTree.addTreeSelectionListener(new TreeSelectionListener() {
 			@Override
@@ -1744,6 +1746,7 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 			} else if (value instanceof TreeNodeBase) {
 				TreeNodeBase node = (TreeNodeBase) value;
 				setText("<html>" + node.getNodeText().toString() + "</html>");
+				setToolTipText(node.getTooltipHtml());
 				if (node instanceof TreeNodeGroup) {
 					setIcon(ImageFactory.getTreeBundle());
 				} else if (node instanceof TreeNodeSegment) {
@@ -1895,6 +1898,10 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		}
 
 		public String getDisplayName() {
+			return null;
+		}
+
+		public String getTooltipHtml() {
 			return null;
 		}
 
@@ -2205,6 +2212,11 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 			return (int) getComposite().getConfDefinition().getLength();
 		}
 
+		@Override
+		protected String getTypeForTooltip() {
+			return getComposite().getConfDefinition().getDatatype();
+		}
+
 		protected boolean isSupported() {
 			return !"X".equals(getComposite().getConfDefinition().getUsage());
 		}
@@ -2463,6 +2475,11 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		}
 
 		@Override
+		protected String getTableForTooltip() {
+			return getTable();
+		}
+
+		@Override
 		public Boolean isHasContent() {
 			Primitive p = (Primitive) getUserObject();
 			String value = p.getValue();
@@ -2568,6 +2585,11 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		}
 
 		@Override
+		protected String getTypeForTooltip() {
+			return getPrimitive().getConfDefinition().getDatatype();
+		}
+
+		@Override
 		protected String getTable() {
 			String retVal = getPrimitive().getConfDefinition().getTable();
 			if (StringUtils.isBlank(retVal)) {
@@ -2634,6 +2656,40 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 			}
 
 			return retVal;
+		}
+
+		@Override
+		public String getTooltipHtml() {
+			String header = FieldTooltipBuilder.escapeHtml(getName());
+			String displayName = getDisplayName();
+			if (StringUtils.isNotBlank(displayName)) {
+				header += " - " + FieldTooltipBuilder.escapeHtml(displayName);
+			}
+			header += " (Segment)";
+
+			StringBuilder sb = new StringBuilder("<html><table cellpadding='2' cellspacing='0'>");
+			sb.append("<tr><td colspan='2'><b>").append(header).append("</b></td></tr>");
+
+			String content = getPipeEncodedValue();
+			if (StringUtils.isNotBlank(content)) {
+				String escaped = FieldTooltipBuilder.escapeHtml(content);
+				if (escaped.length() > 80) {
+					escaped = escaped.substring(0, 77) + "...";
+				}
+				sb.append("<tr><td><b>Content:</b></td><td>").append(escaped).append("</td></tr>");
+			}
+
+			Boolean required = isRequired();
+			if (required != null) {
+				sb.append("<tr><td><b>Required:</b></td><td>").append(required ? "Yes" : "No").append("</td></tr>");
+			}
+			Boolean repeating = isRepeating();
+			if (repeating != null) {
+				sb.append("<tr><td><b>Repeating:</b></td><td>").append(repeating ? "Yes" : "No").append("</td></tr>");
+			}
+
+			sb.append("</table></html>");
+			return sb.toString();
 		}
 
 		@Override
@@ -2788,6 +2844,36 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 			b.append("</i>");
 
 			return b;
+		}
+
+		@Override
+		public String getTooltipHtml() {
+			String name = getDisplayName();
+			if (StringUtils.isBlank(name)) {
+				name = extractComponentName();
+			}
+			if (name != null && name.equals(myParentName)) {
+				name = null;
+			}
+			return new FieldTooltipBuilder()
+					.path(myParentName)
+					.displayName(name)
+					.component(myComponentPath.size() > 1)
+					.content(getPipeEncodedValue())
+					.typeName(getTypeForTooltip())
+					.required(isRequired())
+					.repeating(isRepeating())
+					.maxLength(getMaxLength())
+					.table(getTableForTooltip())
+					.build();
+		}
+
+		protected String getTypeForTooltip() {
+			return getType().getClass().getSimpleName();
+		}
+
+		protected String getTableForTooltip() {
+			return null;
 		}
 
 		private String extractComponentName() {

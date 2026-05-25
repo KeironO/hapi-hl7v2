@@ -722,6 +722,20 @@ public class Hl7V2MessageCollection extends AbstractModelClass {
 		}
 	}
 
+	public String getFieldTooltipHtmlAtOffset(int absoluteOffset) {
+		for (int i = 0; i < myMessageRanges.size(); i++) {
+			Range range = myMessageRanges.get(i);
+			if (range.contains(absoluteOffset)) {
+				AbstractMessage<?> am = myMessages.get(i);
+				if (am instanceof Hl7V2MessageEr7) {
+					return ((Hl7V2MessageEr7) am).getFieldTooltipHtmlAtOffset(absoluteOffset - range.getStart());
+				}
+				break;
+			}
+		}
+		return null;
+	}
+
 	public void setHighlitedPathBasedOnRange(Range theRange) {
 
 		final String oldValue = myHighlitedPath;

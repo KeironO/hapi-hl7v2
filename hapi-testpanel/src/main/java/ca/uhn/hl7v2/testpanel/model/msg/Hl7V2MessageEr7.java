@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,9 +44,15 @@ import ca.uhn.hl7v2.model.Segment;
 import ca.uhn.hl7v2.model.Structure;
 import ca.uhn.hl7v2.model.Type;
 import ca.uhn.hl7v2.model.Varies;
+import ca.uhn.hl7v2.model.primitive.ID;
+import ca.uhn.hl7v2.model.primitive.IS;
 import ca.uhn.hl7v2.parser.DefaultXMLParser;
 import ca.uhn.hl7v2.parser.EncodingCharacters;
+import ca.uhn.hl7v2.parser.PipeParser;
+import ca.uhn.hl7v2.testpanel.model.conf.ConformanceComposite;
+import ca.uhn.hl7v2.testpanel.model.conf.ConformancePrimitive;
 import ca.uhn.hl7v2.testpanel.util.CharCountingStringIteratorDecorator;
+import ca.uhn.hl7v2.testpanel.util.FieldTooltipBuilder;
 import ca.uhn.hl7v2.testpanel.util.Range;
 import ca.uhn.hl7v2.testpanel.util.SegmentAndComponentPath;
 import ca.uhn.hl7v2.testpanel.xsd.Hl7V2EncodingTypeEnum;
@@ -364,6 +371,180 @@ public class Hl7V2MessageEr7 extends Hl7V2MessageBase {
 		ourLog.info("Highlited path is now: " + fullPath);
 
 		myHighlitedPath = fullPath;
+	}
+
+	public String getFieldTooltipHtmlAtOffset(int dot) {
+		if (dot < 0 || mySegmentRanges.isEmpty()) {
+			return null;
+		}
+
+		int dotIndex = -1;
+		Range segmentRange = null;
+		for (int i = 0; i < mySegmentRanges.size(); i++) {
+			segmentRange = mySegmentRanges.get(i);
+			if (segmentRange != null && segmentRange.contains(dot)) {
+				dotIndex = i;
+				break;
+			}
+		}
+		if (dotIndex == -1) {
+			return null;
+		}
+
+		EncodingCharacters enc;
+		try {
+			enc = EncodingCharacters.getInstance(getParsedMessage());
+		} catch (HL7Exception e) {
+			return null;
+		}
+
+		int fieldIndex = 0;
+		int cmpIndex = 0;
+		int subCmpIndex = 0;
+		int repIndex = 0;
+		for (int i = segmentRange.getStart() + 1; i <= segmentRange.getEnd() && i <= dot && i <= getSourceMessage().length(); i++) {
+			char nextChar = getSourceMessage().charAt(i - 1);
+			if (nextChar == enc.getRepetitionSeparator()) {
+				repIndex++;
+				cmpIndex = 1;
+				subCmpIndex = 1;
+			} else if (nextChar == enc.getFieldSeparator()) {
+				fieldIndex++;
+				repIndex = 0;
+				cmpIndex = 1;
+				subCmpIndex = 1;
+			} else if (nextChar == enc.getComponentSeparator()) {
+				cmpIndex++;
+				subCmpIndex = 1;
+			} else if (nextChar == enc.getSubcomponentSeparator()) {
+				subCmpIndex++;
+			}
+		}
+
+		Segment segment = mySegmentIndexes.get(dotIndex);
+		if (segment.getName().equals("MSH")) {
+			fieldIndex++;
+			if (fieldIndex == 2) {
+				cmpIndex = 1;
+				subCmpIndex = 1;
+				repIndex = 0;
+			}
+		}
+
+		// Hovering over the segment name itself
+		if (fieldIndex == 0) {
+			return "<html><b>" + FieldTooltipBuilder.escapeHtml(segment.getName()) + "</b> &mdash; Segment</html>";
+		}
+
+		try {
+			int repToFetch = repIndex > 0 ? repIndex : 0;
+			Type type = segment.getField(fieldIndex, repToFetch);
+			if (type instanceof Varies) {
+				type = ((Varies) type).getData();
+			}
+
+			// Resolve component/subcomponent
+			if (type instanceof Composite) {
+				Composite composite = (Composite) type;
+				int effectiveCmp = cmpIndex >= 1 ? cmpIndex - 1 : 0;
+				if (effectiveCmp < composite.getComponents().length) {
+					Type cmpType = composite.getComponent(effectiveCmp);
+					if (cmpType instanceof Varies) {
+						cmpType = ((Varies) cmpType).getData();
+					}
+					if (cmpType instanceof Primitive) {
+						subCmpIndex = 0;
+					}
+					type = cmpType;
+				}
+			} else {
+				cmpIndex = 0;
+				subCmpIndex = 0;
+			}
+
+			// Build terser path string
+			String basePath = mySegmentTerserPaths.get(dotIndex);
+			StringBuilder pathB = new StringBuilder(basePath).append('-').append(fieldIndex);
+			if (cmpIndex >= 1) {
+				pathB.append('-').append(cmpIndex);
+				if (subCmpIndex >= 1) {
+					pathB.append('-').append(subCmpIndex);
+				}
+			}
+			String path = pathB.toString();
+
+			// Field display name from segment
+			String fieldName = null;
+			String[] names = segment.getNames();
+			if (fieldIndex <= names.length) {
+				fieldName = names[fieldIndex - 1];
+			}
+
+			// Metadata
+			String typeName;
+			Integer maxLength = null;
+			String table = null;
+
+			if (type instanceof ConformancePrimitive) {
+				ConformancePrimitive cp = (ConformancePrimitive) type;
+				typeName = cp.getConfDefinition().getDatatype();
+				long len = cp.getConfDefinition().getLength();
+				if (len > 0) {
+					maxLength = (int) len;
+				}
+				String tbl = cp.getConfDefinition().getTable();
+				if (StringUtils.isNotBlank(tbl)) {
+					table = tbl;
+				}
+			} else if (type instanceof ConformanceComposite) {
+				ConformanceComposite cc = (ConformanceComposite) type;
+				typeName = cc.getConfDefinition().getDatatype();
+				long len = cc.getConfDefinition().getLength();
+				if (len > 0) {
+					maxLength = (int) len;
+				}
+			} else {
+				typeName = type.getClass().getSimpleName();
+				if (type instanceof ID) {
+					int tblNum = ((ID) type).getTable();
+					if (tblNum > 0) {
+						table = "HL7" + StringUtils.leftPad(Integer.toString(tblNum), 4, '0');
+					}
+				} else if (type instanceof IS) {
+					int tblNum = ((IS) type).getTable();
+					if (tblNum > 0) {
+						table = "HL7" + StringUtils.leftPad(Integer.toString(tblNum), 4, '0');
+					}
+				}
+			}
+
+			boolean required = segment.isRequired(fieldIndex);
+			boolean repeating = segment.getMaxCardinality(fieldIndex) != 1;
+
+			// Field content
+			String content;
+			try {
+				content = PipeParser.encode(type, enc);
+			} catch (Exception ex) {
+				content = null;
+			}
+
+			// Build tooltip HTML
+			return new FieldTooltipBuilder()
+					.path(path)
+					.displayName(fieldName)
+					.component(cmpIndex > 0)
+					.content(content)
+					.typeName(typeName)
+					.required(required)
+					.repeating(repeating)
+					.maxLength(maxLength)
+					.table(table)
+					.build();
+
+		} catch (HL7Exception e) {
+			return null;
+		}
 	}
 
 	public void setHighlitedRangeBasedOnSegment(Segment... theSegment) {

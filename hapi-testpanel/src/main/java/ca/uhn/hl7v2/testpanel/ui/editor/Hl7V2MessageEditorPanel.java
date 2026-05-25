@@ -50,6 +50,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.Box;
+import javax.swing.ToolTipManager;
 import javax.swing.ButtonGroup;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.ImageIcon;
@@ -224,7 +225,20 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		mysplitPane.setRightComponent(messageEditorContainerPanel);
 		messageEditorContainerPanel.setLayout(new BorderLayout(0, 0));
 
-		myMessageEditor = new RSyntaxTextArea();
+		myMessageEditor = new RSyntaxTextArea() {
+			@Override
+			public String getToolTipText(MouseEvent e) {
+				if (myMessage == null) {
+					return null;
+				}
+				int offset = viewToModel(e.getPoint());
+				if (offset < 0) {
+					return null;
+				}
+				return myMessage.getFieldTooltipHtmlAtOffset(offset);
+			}
+		};
+		ToolTipManager.sharedInstance().registerComponent(myMessageEditor);
 		myMessageEditor.setSyntaxEditingStyle(SYNTAX_STYLE_ER7);
 		myMessageEditor.setCodeFoldingEnabled(false);
 		myMessageEditor.setLineWrap(false);
