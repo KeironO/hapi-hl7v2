@@ -38,7 +38,9 @@ import java.awt.Insets;
 import java.awt.SystemColor;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.Transferable;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
@@ -56,8 +58,10 @@ import javax.swing.DefaultComboBoxModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JRadioButton;
@@ -67,6 +71,7 @@ import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.TransferHandler;
 import javax.swing.UIManager;
 import javax.swing.event.CaretEvent;
 import javax.swing.event.CaretListener;
@@ -598,6 +603,61 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 			}
 		};
 		myMessageEditor.getDocument().addDocumentListener(myDocumentListener);
+
+		final TransferHandler originalTransferHandler = myMessageEditor.getTransferHandler();
+		myMessageEditor.setTransferHandler(new TransferHandler() {
+			@Override
+			public boolean canImport(TransferSupport support) {
+				return originalTransferHandler.canImport(support);
+			}
+
+			@Override
+			public int getSourceActions(JComponent c) {
+				return originalTransferHandler.getSourceActions(c);
+			}
+
+			@Override
+			public boolean importData(TransferSupport support) {
+				if (support.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+					try {
+						String text = (String) support.getTransferable().getTransferData(DataFlavor.stringFlavor);
+						if (text != null && text.contains("\r")) {
+							boolean hasCRLF = text.contains("\r\n");
+							boolean hasCROnly = text.replace("\r\n", "").contains("\r");
+
+							String lineEndingType;
+							if (hasCRLF && hasCROnly) {
+								lineEndingType = "mixed (Windows CRLF and old Mac CR)";
+							} else if (hasCRLF) {
+								lineEndingType = "Windows (CRLF, \\r\\n)";
+							} else {
+								lineEndingType = "old Mac (CR, \\r)";
+							}
+
+							int choice = JOptionPane.showConfirmDialog(
+								myMessageEditor,
+								"<html>The pasted text uses <b>" + lineEndingType + "</b> line endings.<br>" +
+								"Convert to Unix (LF) line endings before inserting?</html>",
+								"Non-Standard Line Endings Detected",
+								JOptionPane.YES_NO_CANCEL_OPTION,
+								JOptionPane.QUESTION_MESSAGE
+							);
+
+							if (choice == JOptionPane.CANCEL_OPTION) {
+								return false;
+							} else if (choice == JOptionPane.YES_OPTION) {
+								text = text.replace("\r\n", "\n").replace("\r", "\n");
+								Transferable modified = new StringSelection(text);
+								return originalTransferHandler.importData(new TransferSupport(support.getComponent(), modified));
+							}
+						}
+					} catch (Exception e) {
+						ourLog.warn("Error inspecting paste content: {}", e.getMessage());
+					}
+				}
+				return originalTransferHandler.importData(support);
+			}
+		});
 
 		myMessageEditor.addCaretListener(new CaretListener() {
 
