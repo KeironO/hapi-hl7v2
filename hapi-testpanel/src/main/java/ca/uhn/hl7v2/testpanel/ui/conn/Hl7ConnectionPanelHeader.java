@@ -1,13 +1,12 @@
 package ca.uhn.hl7v2.testpanel.ui.conn;
 
-import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.util.List;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -16,7 +15,6 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.UIManager;
-import javax.swing.event.DocumentEvent;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -26,7 +24,7 @@ import ca.uhn.hl7v2.testpanel.model.conn.InboundConnection;
 import ca.uhn.hl7v2.testpanel.model.conn.OutboundConnection;
 import ca.uhn.hl7v2.testpanel.ui.IDestroyable;
 import ca.uhn.hl7v2.testpanel.ui.ImageFactory;
-import ca.uhn.hl7v2.testpanel.util.SimpleDocumentListener;
+import net.miginfocom.swing.MigLayout;
 
 public class Hl7ConnectionPanelHeader extends JPanel implements IDestroyable {
 
@@ -47,105 +45,72 @@ public class Hl7ConnectionPanelHeader extends JPanel implements IDestroyable {
 	private PropertyChangeListener myNamePropertyChangeListener;
 	private PropertyChangeListener myStatusPropertyChangeListener;
 	private PropertyChangeListener myStatusLinePropertyChangeListener;
-	private boolean myIgnoreNameChanges;
 
 	public Hl7ConnectionPanelHeader() {
 		setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
-		setLayout(new BorderLayout(0, 8));
+		setLayout(new MigLayout("insets 0, wrap 2", "[grow][right]", "[][][][grow]"));
 
 		// ── Title row ─────────────────────────────────────────────────────────
-		JPanel titleRow = new JPanel(new BorderLayout(8, 0));
-		titleRow.setOpaque(false);
-
 		myTitleLabel = new JLabel("Connection");
 		myTitleLabel.setFont(myTitleLabel.getFont().deriveFont(Font.BOLD, 14f));
-		titleRow.add(myTitleLabel, BorderLayout.WEST);
+		add(myTitleLabel, "growx");
 
 		myStatusBadge = new JLabel();
 		myStatusBadge.setFont(myStatusBadge.getFont().deriveFont(Font.BOLD, 12f));
-		titleRow.add(myStatusBadge, BorderLayout.EAST);
+		add(myStatusBadge, "right");
 
-		add(titleRow, BorderLayout.NORTH);
-
-		// ── Centre: name + controls ────────────────────────────────────────────
-		JPanel centrePanel = new JPanel(new BorderLayout(0, 6));
-		centrePanel.setOpaque(false);
-
-		// Name row
-		JPanel nameRow = new JPanel(new BorderLayout(8, 0));
-		nameRow.setOpaque(false);
-
-		myRememberAsCheckBox = new JCheckBox("Save with name:");
-		myRememberAsCheckBox.setToolTipText("If checked, this connection will be saved for the next time you start TestPanel");
+		// ── Name row ─────────────────────────────────────────────────────────
+		myRememberAsCheckBox = new JCheckBox("Save connection for future sessions:");
+		myRememberAsCheckBox.setToolTipText("Keep this connection after TestPanel is closed. Enter a descriptive name beside this option.");
 		myRememberAsCheckBox.setOpaque(false);
-		myRememberAsCheckBox.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				myConnection.setPersistent(myRememberAsCheckBox.isSelected());
-				updateRememberAsUi();
-			}
+		myRememberAsCheckBox.addActionListener(e -> {
+			myConnection.setPersistent(myRememberAsCheckBox.isSelected());
+			updateRememberAsUi();
 		});
-		nameRow.add(myRememberAsCheckBox, BorderLayout.WEST);
+		add(myRememberAsCheckBox);
 
 		myNameBox = new JTextField();
-		myNameBox.getDocument().addDocumentListener(new SimpleDocumentListener() {
+		myNameBox.setToolTipText("A descriptive name used to identify this connection");
+		myNameBox.addActionListener(e -> commitNameFromField());
+		myNameBox.addFocusListener(new FocusAdapter() {
 			@Override
-			public void update(DocumentEvent theE) {
-				if (!myNameBox.isEnabled()) {
-					return;
-				}
-				myIgnoreNameChanges = true;
-				try {
-					myConnection.setNameExplicitly(myNameBox.getText());
-				} finally {
-					myIgnoreNameChanges = false;
-				}
+			public void focusLost(FocusEvent e) {
+				commitNameFromField();
 			}
 		});
-		nameRow.add(myNameBox, BorderLayout.CENTER);
+		add(myNameBox, "growx");
 
-		centrePanel.add(nameRow, BorderLayout.NORTH);
-
-		// Controls row: Start, Stop, status detail
-		JPanel controlRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-		controlRow.setOpaque(false);
-
+		// ── Controls row ─────────────────────────────────────────────────────
 		myStartButton = new JButton("Start");
 		myStartButton.setIcon(ImageFactory.getStartOne());
-		myStartButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				myConnection.start();
-			}
-		});
-		controlRow.add(myStartButton);
+		myStartButton.addActionListener(e -> myConnection.start());
+		add(myStartButton, "split 3");
 
 		myStopButton = new JButton("Stop");
 		myStopButton.setIcon(ImageFactory.getStop());
-		myStopButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				myConnection.stop();
-			}
-		});
-		controlRow.add(myStopButton);
+		myStopButton.addActionListener(e -> myConnection.stop());
+		add(myStopButton);
 
 		myStatusDetailLabel = new JLabel();
 		myStatusDetailLabel.setFont(myStatusDetailLabel.getFont().deriveFont(11f));
-		controlRow.add(myStatusDetailLabel);
+		add(myStatusDetailLabel, "growx");
 
-		centrePanel.add(controlRow, BorderLayout.CENTER);
-
-		add(centrePanel, BorderLayout.CENTER);
-
-		// Bottom separator
+		// ── Bottom separator ─────────────────────────────────────────────────
 		JPanel separator = new JPanel();
 		separator.setOpaque(false);
 		separator.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0,
 				UIManager.getColor("Separator.foreground") != null
 						? UIManager.getColor("Separator.foreground")
 						: new Color(0xD1, 0xD5, 0xDB)));
-		add(separator, BorderLayout.SOUTH);
+		add(separator, "span 2, growx, h 1!");
 	}
 
 	public void setConnection(AbstractConnection theConnection) {
+		// Clean up previous listeners to prevent accumulation
+		if (myConnection != null) {
+			destroy();
+		}
+
 		myConnection = theConnection;
 
 		setLabelText(theConnection instanceof InboundConnection
@@ -156,9 +121,7 @@ public class Hl7ConnectionPanelHeader extends JPanel implements IDestroyable {
 
 		myNamePropertyChangeListener = new PropertyChangeListener() {
 			public void propertyChange(PropertyChangeEvent theEvt) {
-				if (!myIgnoreNameChanges) {
-					myNameBox.setText(myConnection.getName());
-				}
+				myNameBox.setText(myConnection.getName());
 			}
 		};
 		myConnection.addPropertyChangeListener(OutboundConnection.NAME_PROPERTY, myNamePropertyChangeListener);
@@ -245,6 +208,20 @@ public class Hl7ConnectionPanelHeader extends JPanel implements IDestroyable {
 	public void markDisableStartingAndStopping() {
 		myStartButton.setEnabled(false);
 		myStopButton.setEnabled(false);
+	}
+
+	public void setValidationErrors(List<ConnectionValidator.ValidationError> theErrors) {
+		ConnectionValidationUi.apply(myNameBox, ConnectionValidationUi.getError(theErrors, "name"));
+	}
+
+	private void commitNameFromField() {
+		if (!myNameBox.isEnabled() || myConnection == null) {
+			return;
+		}
+		String name = myNameBox.getText();
+		if (StringUtils.isNotBlank(name)) {
+			myConnection.setNameExplicitly(name);
+		}
 	}
 
 	public void destroy() {

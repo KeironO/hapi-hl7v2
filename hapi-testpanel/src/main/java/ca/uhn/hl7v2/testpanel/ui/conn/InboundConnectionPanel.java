@@ -1,6 +1,5 @@
 package ca.uhn.hl7v2.testpanel.ui.conn;
 
-import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Font;
 import java.beans.PropertyChangeEvent;
@@ -31,6 +30,7 @@ import ca.uhn.hl7v2.testpanel.model.conn.InboundConnection;
 import ca.uhn.hl7v2.testpanel.ui.ActivityTable;
 import ca.uhn.hl7v2.testpanel.ui.BaseMainPanel;
 import ca.uhn.hl7v2.testpanel.ui.IDestroyable;
+import net.miginfocom.swing.MigLayout;
 
 public class InboundConnectionPanel extends BaseMainPanel implements IDestroyable {
 
@@ -49,41 +49,43 @@ public class InboundConnectionPanel extends BaseMainPanel implements IDestroyabl
 	private VetoableChangeListener myNewMessagesPropertyListener;
 
 	public InboundConnectionPanel(Controller theController) {
-		setLayout(new BorderLayout(0, 0));
+		setLayout(new MigLayout("wrap 1, insets 0", "[grow]", "[][grow]"));
 
 		// ── Top: header + validation ───────────────────────────────────────────
-		JPanel topPanel = new JPanel(new BorderLayout(0, 0));
+		JPanel topPanel = new JPanel(new MigLayout("wrap 1, insets 0", "[grow]"));
 		topPanel.setOpaque(false);
 
 		myHeaderPanel = new Hl7ConnectionPanelHeader();
-		topPanel.add(myHeaderPanel, BorderLayout.NORTH);
+		topPanel.add(myHeaderPanel, "growx");
 
 		myValidationPanel = new ValidationHeaderPanel(theController);
-		topPanel.add(myValidationPanel, BorderLayout.CENTER);
+		topPanel.add(myValidationPanel, "growx");
 
-		add(topPanel, BorderLayout.NORTH);
+		add(topPanel, "growx");
 
 		// ── Centre: tabbed content ─────────────────────────────────────────────
 		myTabbedPane = new JTabbedPane(JTabbedPane.TOP);
 		myTabbedPane.setBorder(BorderFactory.createEmptyBorder(4, 0, 0, 0));
-		add(myTabbedPane, BorderLayout.CENTER);
+		add(myTabbedPane, "grow, push");
 
 		// Settings tab
 		mySettingPanelTab = new Hl7ConnectionPanel(theController);
 		mySettingPanelTab.setBorder(null);
-		myTabbedPane.addTab("Settings", mySettingPanelTab);
+		myTabbedPane.addTab("Connection Settings", mySettingPanelTab);
+		myTabbedPane.setToolTipTextAt(0, "Configure transport, validation, security, and message settings");
 
 		// Activity tab
 		myActivitySplitPaneTab = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
 		myActivitySplitPaneTab.setResizeWeight(0.3);
 		myActivitySplitPaneTab.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 		myTabbedPane.addTab("Activity", myActivitySplitPaneTab);
+		myTabbedPane.setToolTipTextAt(1, "View connected clients and recent receiving activity");
 
 		// Left: connected clients
-		JPanel connectionsPanel = new JPanel(new BorderLayout(0, 4));
+		JPanel connectionsPanel = new JPanel(new MigLayout("wrap 1, insets 0", "[grow]", "[][grow]"));
 		connectionsPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 4));
 		connectionsPanel.setOpaque(false);
-		connectionsPanel.add(sectionLabel("Connections"), BorderLayout.NORTH);
+		connectionsPanel.add(sectionLabel("Connections"), "growx");
 
 		myConnectionsTableModel = new ConnectionsTableModel();
 		myConnectionsTable = new JTable(myConnectionsTableModel);
@@ -93,19 +95,19 @@ public class InboundConnectionPanel extends BaseMainPanel implements IDestroyabl
 				UIManager.getColor("Separator.foreground") != null
 						? UIManager.getColor("Separator.foreground")
 						: new Color(0xD1, 0xD5, 0xDB)));
-		connectionsPanel.add(connectionsScroll, BorderLayout.CENTER);
+		connectionsPanel.add(connectionsScroll, "grow, push");
 		myActivitySplitPaneTab.setLeftComponent(connectionsPanel);
 
 		// Right: activity log
-		JPanel activityPanel = new JPanel(new BorderLayout(0, 4));
+		JPanel activityPanel = new JPanel(new MigLayout("wrap 1, insets 0", "[grow]", "[][grow]"));
 		activityPanel.setOpaque(false);
-		activityPanel.add(sectionLabel("Activity"), BorderLayout.NORTH);
+		activityPanel.add(sectionLabel("Activity"), "growx");
 
 		myActivityTable = new ActivityTable();
 		myActivityTable.getScrollPane().setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 		myActivityTable.getScrollPane().setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
 		myActivityTable.setController(theController);
-		activityPanel.add(myActivityTable, BorderLayout.CENTER);
+		activityPanel.add(myActivityTable, "grow, push");
 		myActivitySplitPaneTab.setRightComponent(activityPanel);
 	}
 

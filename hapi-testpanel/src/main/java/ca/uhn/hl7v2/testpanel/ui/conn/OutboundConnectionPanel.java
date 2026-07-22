@@ -1,6 +1,5 @@
 package ca.uhn.hl7v2.testpanel.ui.conn;
 
-import java.awt.BorderLayout;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 
@@ -15,6 +14,7 @@ import ca.uhn.hl7v2.testpanel.model.conn.OutboundConnection;
 import ca.uhn.hl7v2.testpanel.ui.ActivityTable;
 import ca.uhn.hl7v2.testpanel.ui.BaseMainPanel;
 import ca.uhn.hl7v2.testpanel.ui.IDestroyable;
+import net.miginfocom.swing.MigLayout;
 
 public class OutboundConnectionPanel extends BaseMainPanel implements IDestroyable {
 
@@ -29,26 +29,28 @@ public class OutboundConnectionPanel extends BaseMainPanel implements IDestroyab
 
 	public OutboundConnectionPanel(Controller theController) {
 		myController = theController;
-		setLayout(new BorderLayout(0, 0));
+		setLayout(new MigLayout("wrap 1, insets 0", "[grow]", "[][grow]"));
 
 		myHeaderPanel = new Hl7ConnectionPanelHeader();
-		add(myHeaderPanel, BorderLayout.NORTH);
+		add(myHeaderPanel, "growx");
 
 		myTabbedPane = new JTabbedPane(JTabbedPane.TOP);
 		myTabbedPane.setBorder(BorderFactory.createEmptyBorder(4, 0, 0, 0));
-		add(myTabbedPane, BorderLayout.CENTER);
+		add(myTabbedPane, "grow, push");
 
 		// Settings tab
 		mySettingPanel = new Hl7ConnectionPanel(myController);
 		mySettingPanel.setBorder(null);
-		myTabbedPane.addTab("Settings", mySettingPanel);
+		myTabbedPane.addTab("Connection Settings", mySettingPanel);
+		myTabbedPane.setToolTipTextAt(0, "Configure transport, encoding, security, and message settings");
 
 		// Activity tab
-		JPanel activityTab = new JPanel(new BorderLayout(0, 0));
+		JPanel activityTab = new JPanel(new MigLayout("insets 8", "[grow]", "[grow]"));
 		activityTab.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 		myActivityTable = new ActivityTable();
-		activityTab.add(myActivityTable, BorderLayout.CENTER);
+		activityTab.add(myActivityTable, "grow");
 		myTabbedPane.addTab("Activity", activityTab);
+		myTabbedPane.setToolTipTextAt(1, "View recent sending activity");
 	}
 
 	public void destroy() {

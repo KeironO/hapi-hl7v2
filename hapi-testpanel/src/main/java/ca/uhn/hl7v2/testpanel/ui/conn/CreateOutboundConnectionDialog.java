@@ -25,22 +25,24 @@
  */
 package ca.uhn.hl7v2.testpanel.ui.conn;
 
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.List;
 
 import javax.swing.JButton;
 import javax.swing.JDialog;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 
 import ca.uhn.hl7v2.testpanel.controller.Controller;
 import ca.uhn.hl7v2.testpanel.model.conn.OutboundConnection;
 import ca.uhn.hl7v2.testpanel.ui.IDestroyable;
 import ca.uhn.hl7v2.testpanel.util.IOkCancelCallback;
+import net.miginfocom.swing.MigLayout;
 
 public class CreateOutboundConnectionDialog extends JDialog implements IDestroyable {
 
@@ -49,6 +51,9 @@ public class CreateOutboundConnectionDialog extends JDialog implements IDestroya
 	private final JPanel mycontentPanel = new JPanel();
 	private boolean myDone;
 	private Controller myController;
+	private JButton myOkButton;
+	private JLabel myValidationLabel;
+	private Timer myValidationTimer;
 
 	/**
 	 * Create the dialog.
@@ -62,45 +67,53 @@ public class CreateOutboundConnectionDialog extends JDialog implements IDestroya
 			@Override
 			public void windowClosing(WindowEvent e) {
 				if (!myDone) {
+					stopValidationTimer();
 					theHandler.cancel(theConnection);
 				}
 			}
 		});
 		setModal(true);
 		setTitle("New Sending Connection");
-		setBounds(100, 100, 687, 480);
-		getContentPane().setLayout(new BorderLayout());
+		setBounds(100, 100, 900, 700);
+		getContentPane().setLayout(new MigLayout("wrap 1, insets 0", "[grow]", "[][grow][]"));
 
 		myHeaderPanel = new Hl7ConnectionPanelHeader();
 		myHeaderPanel.setConnection(theConnection);
 		myHeaderPanel.markDisableStartingAndStopping();
-		getContentPane().add(myHeaderPanel, BorderLayout.NORTH);
+		getContentPane().add(myHeaderPanel, "growx");
 
 		mycontentPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
-		getContentPane().add(mycontentPanel, BorderLayout.CENTER);
-		mycontentPanel.setLayout(new BorderLayout(0, 0));
+		getContentPane().add(mycontentPanel, "grow");
+		mycontentPanel.setLayout(new MigLayout("insets 0", "[grow]", "[grow]"));
 
-		JPanel buttonPane = new JPanel();
-		buttonPane.setLayout(new FlowLayout(FlowLayout.RIGHT));
-		getContentPane().add(buttonPane, BorderLayout.SOUTH);
+		JPanel buttonPane = new JPanel(new MigLayout("insets 5 10 10 10", "[grow][] []"));
+		getContentPane().add(buttonPane, "growx");
 
-		JButton okButton = new JButton("OK");
-		okButton.addActionListener(new ActionListener() {
+		myValidationLabel = new JLabel(" ");
+		buttonPane.add(myValidationLabel, "growx");
+
+		myOkButton = new JButton("OK");
+		myOkButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
+				if (!updateValidation(theConnection)) {
+					return;
+				}
 				theHandler.ok(theConnection);
 				myDone = true;
+				stopValidationTimer();
 				setVisible(false);
 			}
 		});
-		okButton.setActionCommand("OK");
-		buttonPane.add(okButton);
-		getRootPane().setDefaultButton(okButton);
+		myOkButton.setActionCommand("OK");
+		buttonPane.add(myOkButton);
+		getRootPane().setDefaultButton(myOkButton);
 
 		JButton cancelButton = new JButton("Cancel");
 		cancelButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				theHandler.cancel(theConnection);
 				myDone = true;
+				stopValidationTimer();
 				setVisible(false);
 			}
 		});
@@ -109,12 +122,33 @@ public class CreateOutboundConnectionDialog extends JDialog implements IDestroya
 
 		myConnectionPanel = new Hl7ConnectionPanel(myController);
 		myConnectionPanel.setConnection(theConnection);
-		mycontentPanel.add(myConnectionPanel, BorderLayout.CENTER);
+		mycontentPanel.add(myConnectionPanel, "grow");
+
+		myValidationTimer = new Timer(150, e -> updateValidation(theConnection));
+		myValidationTimer.start();
+		updateValidation(theConnection);
 
 	}
 
+	private boolean updateValidation(OutboundConnection theConnection) {
+		List<ConnectionValidator.ValidationError> errors = ConnectionValidator.validate(theConnection);
+		myHeaderPanel.setValidationErrors(errors);
+		myConnectionPanel.setValidationErrors(errors);
+		myOkButton.setEnabled(errors.isEmpty());
+		myValidationLabel.setText(errors.isEmpty() ? " " : errors.get(0).getMessage());
+		return errors.isEmpty();
+	}
+
+	private void stopValidationTimer() {
+		if (myValidationTimer != null) {
+			myValidationTimer.stop();
+		}
+	}
+
 	public void destroy() {
+		stopValidationTimer();
 		myConnectionPanel.destroy();
+		myHeaderPanel.destroy();
 	}
 
 }

@@ -188,6 +188,11 @@
 			<artifactId>flatlaf-extras</artifactId>
 			<version>3.2.5</version>
 		</dependency>
+		<dependency>
+			<groupId>com.miglayout</groupId>
+			<artifactId>miglayout-swing</artifactId>
+			<version>11.4.3</version>
+		</dependency>
 
 	</dependencies>
 	<build>

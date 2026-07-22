@@ -107,6 +107,7 @@ public abstract class AbstractConnection extends AbstractModelClass implements I
 	public static final String RECENT_ACTIVITY_PROPERTY = AbstractConnection.class.getName() + "_RECENT_ACTIVITY";
 	public static final String STATUS_LINE_PROPERTY = AbstractConnection.class.getName() + "_STATUS_LINE";
 	public static final String STATUS_PROPERTY = AbstractConnection.class.getName() + "_STATUS";
+	public static final String TLS_PROPERTY = AbstractConnection.class.getName() + "_TLS";
 	public static final String TLS_KEYSTORE_STATUS = AbstractConnection.class.getName() + "_TLS_KEYSTORE_STATUS";
 	public static final String TRANSPORT_PROPERTY = AbstractConnection.class.getName() + "_TRANSPORT";
 
@@ -1078,6 +1079,7 @@ public abstract class AbstractConnection extends AbstractModelClass implements I
 		myTls = theSelected;
 		if (oldValue != myTls) {
 			myTlsKeystore = null;
+			firePropertyChange(TLS_PROPERTY, oldValue, myTls);
 		}
 	}
 

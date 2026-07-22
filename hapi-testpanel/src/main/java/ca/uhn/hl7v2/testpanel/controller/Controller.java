@@ -189,7 +189,7 @@ public class Controller {
 		CreateInboundConnectionDialog dialog = new CreateInboundConnectionDialog(this, con, new IOkCancelCallback<InboundConnection>() {
 			public void ok(InboundConnection theArg) {
 				myInboundConnectionList.addConnection(theArg);
-				setLeftSelectedItem(theArg);
+				EventQueue.invokeLater(() -> setLeftSelectedItem(theArg));
 			}
 
 			public void cancel(InboundConnection theArg) {
@@ -253,7 +253,7 @@ public class Controller {
 		CreateOutboundConnectionDialog dialog = new CreateOutboundConnectionDialog(this, con, new IOkCancelCallback<OutboundConnection>() {
 			public void ok(OutboundConnection theArg) {
 				myOutboundConnectionList.addConnection(theArg);
-				setLeftSelectedItem(theArg);
+				EventQueue.invokeLater(() -> setLeftSelectedItem(theArg));
 			}
 
 			public void cancel(OutboundConnection theArg) {
@@ -968,7 +968,7 @@ public class Controller {
 		});
 		window.getContentPane().setLayout(new BorderLayout());
 		window.getContentPane().add(panel, BorderLayout.CENTER);
-		window.setSize(750, 560);
+		window.setSize(900, 700);
 		return window;
 	}
 
