@@ -558,7 +558,8 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 
 		int currentMessageIndex = -1;
 		int bestMatchRow = -1;
-		int bestMatchScore = -1;
+
+		// First pass: look for exact match
 		for (int row = 0; row < myTree.getRowCount(); row++) {
 			TreePath path = myTree.getPathForRow(row);
 			if (path == null) {
@@ -582,15 +583,47 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 				TreeNodeBase node = (TreeNodeBase) component;
 				String terserPath = (currentMessageIndex) + node.getTerserPath();
 
-				int matchScore = calculateMatchScore(highlitedPath, terserPath);
-
-				if (matchScore > bestMatchScore) {
-					bestMatchScore = matchScore;
+				if (highlitedPath.equals(terserPath)) {
 					bestMatchRow = row;
+					break;
+				}
+			}
+		}
+
+		// If no exact match, fall back to fuzzy scoring
+		if (bestMatchRow == -1) {
+			int bestMatchScore = -1;
+			currentMessageIndex = -1;
+			for (int row = 0; row < myTree.getRowCount(); row++) {
+				TreePath path = myTree.getPathForRow(row);
+				if (path == null) {
+					continue;
 				}
 
-				if (matchScore > 0) {
-					myTree.expandPath(path);
+				Object component = path.getLastPathComponent();
+				if (component instanceof TreeNodeMessage) {
+					currentMessageIndex = ((TreeNodeMessage) component).getMessageIndex();
+					continue;
+				}
+
+				if (component instanceof TreeNodeUnknown) {
+					continue;
+				}
+
+				if (component instanceof TreeNodeBase) {
+					TreeNodeBase node = (TreeNodeBase) component;
+					String terserPath = (currentMessageIndex) + node.getTerserPath();
+
+					int matchScore = calculateMatchScore(highlitedPath, terserPath);
+
+					if (matchScore > bestMatchScore) {
+						bestMatchScore = matchScore;
+						bestMatchRow = row;
+					}
+
+					if (matchScore > 0) {
+						myTree.expandPath(path);
+					}
 				}
 			}
 		}

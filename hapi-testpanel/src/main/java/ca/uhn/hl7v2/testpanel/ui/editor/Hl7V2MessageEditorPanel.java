@@ -253,14 +253,6 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		myMessageEditor.setFont(resolveEditorFont(14));
 		applyEditorTheme();
 
-		myMessageEditor.addCaretListener(new javax.swing.event.CaretListener() {
-			public void caretUpdate(javax.swing.event.CaretEvent e) {
-				if (myFollowToggle.isSelected()) {
-					highlightFieldAtCursorPosition(e.getDot());
-				}
-			}
-		});
-
 		myMessageScrollPane = new RTextScrollPane(myMessageEditor, true);
 		messageEditorContainerPanel.add(myMessageScrollPane);
 
@@ -662,21 +654,12 @@ public class Hl7V2MessageEditorPanel extends BaseMainPanel implements IDestroyab
 		myMessageEditor.addCaretListener(new CaretListener() {
 
 			public void caretUpdate(final CaretEvent theE) {
-				removeMostHighlights();
-				if (!myDisableCaretUpdateHandling) {
-					myController.invokeInBackground(new Runnable() {
-						public void run() {
-							myMessage.setHighlitedPathBasedOnRange(new Range(theE.getDot(), theE.getMark()));
-							final boolean shouldFollow = myFollowToggle.isSelected();
-							SwingUtilities.invokeLater(new Runnable() {
-								public void run() {
-									if (shouldFollow) {
-										myTreePanel.synchronizeTreeWithHighlitedPath();
-									}
-									myTreePanel.repaint();
-								}
-							});
-						}});
+				if (!myDisableCaretUpdateHandling && myFollowToggle.isSelected()) {
+					highlightFieldAtCursorPosition(theE.getDot());
+					removeMostHighlights();
+					myMessage.setHighlitedPathBasedOnRange(new Range(theE.getDot(), theE.getMark()));
+					myTreePanel.synchronizeTreeWithHighlitedPath();
+					myTreePanel.repaint();
 				}
 			}
 		});

@@ -27,9 +27,11 @@ package ca.uhn.hl7v2.testpanel.model.msg;
 
 import java.beans.PropertyVetoException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -51,7 +53,6 @@ import ca.uhn.hl7v2.parser.EncodingCharacters;
 import ca.uhn.hl7v2.parser.PipeParser;
 import ca.uhn.hl7v2.testpanel.model.conf.ConformanceComposite;
 import ca.uhn.hl7v2.testpanel.model.conf.ConformancePrimitive;
-import ca.uhn.hl7v2.testpanel.util.CharCountingStringIteratorDecorator;
 import ca.uhn.hl7v2.testpanel.util.FieldTooltipBuilder;
 import ca.uhn.hl7v2.testpanel.util.Range;
 import ca.uhn.hl7v2.testpanel.util.SegmentAndComponentPath;
@@ -122,6 +123,7 @@ public class Hl7V2MessageEr7 extends Hl7V2MessageBase {
 			}
 		}
 
+		ourLog.info("getLineIndex: segment {} not found in {} indexed segments (name={})", System.identityHashCode(theSegment), mySegmentIndexes.size(), theSegment.getName());
 		return -1;
 	}
 
@@ -131,102 +133,85 @@ public class Hl7V2MessageEr7 extends Hl7V2MessageBase {
 
 	protected void recalculateIndexes() {
 		String[] lines = getSourceMessage().split("\\r");
-		CharCountingStringIteratorDecorator iter = new CharCountingStringIteratorDecorator(Arrays.asList(lines).iterator());
+		ourLog.info("recalculateIndexes: split into {} lines, source length={}", lines.length, getSourceMessage().length());
+		for (int i = 0; i < lines.length && i < 10; i++) {
+			ourLog.info("  line[{}]: {} chars, starts with '{}'", i, lines[i].length(), lines[i].length() >= 3 ? lines[i].substring(0, 3) : lines[i]);
+		}
+
+		// Pre-scan all lines to build a map of segment name -> list of [startOffset, endOffset].
+		// This allows segments to appear in any order in the source text, not just
+		// the order declared in the message structure definition.
+		Map<String, List<int[]>> segmentLocations = new LinkedHashMap<>();
+		int offset = 0;
+		for (int i = 0; i < lines.length; i++) {
+			String line = lines[i];
+			if (line.length() >= 3) {
+				String segmentName = line.substring(0, 3);
+				int start = offset;
+				int end = offset + line.length(); // end is inclusive, covers the trailing \r position
+				segmentLocations.computeIfAbsent(segmentName, k -> new ArrayList<>())
+						.add(new int[] { start, end });
+			}
+			offset += line.length() + 1; // +1 for \r separator
+		}
+
 		mySegmentIndexes.clear();
 		mySegmentRanges.clear();
 		mySegmentTerserPaths.clear();
 
+		Map<String, int[]> segmentCounters = new HashMap<>();
+
+		ourLog.info("Pre-scanned segment locations: {}", segmentLocations.keySet());
+
 		try {
-			// Integer.toString(getIndexWithinCollection())
-			recalculateIndexes(iter, getParsedMessage(), null, "");
+			recalculateIndexes(segmentLocations, segmentCounters, getParsedMessage(), "");
 		} catch (HL7Exception e) {
 			ourLog.error("Failed to calculate message segment indexes", e);
 		}
+
+		ourLog.info("Indexed {} segments: {}", mySegmentIndexes.size(), mySegmentTerserPaths);
 	}
 
-	private String recalculateIndexes(CharCountingStringIteratorDecorator theIter, Group theGroup, String theNameToSearchFor, String thePath) throws HL7Exception {
+	private void recalculateIndexes(Map<String, List<int[]>> theSegmentLocations, Map<String, int[]> theSegmentCounters, Group theGroup, String thePath) throws HL7Exception {
 		for (String nextName : theGroup.getNames()) {
-
-			if (theNameToSearchFor == null && theIter.hasNext()) {
-				do {
-					theNameToSearchFor = theIter.next();
-
-					// Account for \r
-					theIter.setNumCharsReturned(theIter.getNumCharsReturned() + 1);
-
-					if (theNameToSearchFor.length() < 3) {
-						mySegmentIndexes.add(null);
-						mySegmentRanges.add(null);
-					} else {
-						theNameToSearchFor = theNameToSearchFor.substring(0, 3);
-					}
-				} while (theNameToSearchFor == null);
-			}
-
-			if (theNameToSearchFor == null && theIter.hasNext() == false) {
-				return null;
-			}
-
+			// Force creation of at least one rep so that getAll returns
+			// the same Segment references the tree builder sees.
+			theGroup.get(nextName);
 			Structure[] reps = theGroup.getAll(nextName);
+
 			if (theGroup.isGroup(nextName)) {
 				int repIndex = 1;
 				for (Structure structure : reps) {
 					String nextPath = thePath + "/" + nextName + (repIndex > 1 ? "(" + repIndex + ")" : "");
 					repIndex++;
-					theNameToSearchFor = recalculateIndexes(theIter, (Group) structure, theNameToSearchFor, nextPath);
+					recalculateIndexes(theSegmentLocations, theSegmentCounters, (Group) structure, nextPath);
 				}
 				continue;
 			}
 
-			if (!theNameToSearchFor.equals(nextName)) {
-				continue;
+			// It's a segment - look up locations from the pre-scanned map
+			List<int[]> locations = theSegmentLocations.get(nextName);
+			if (locations == null || locations.isEmpty()) {
+				continue; // Segment not present in message text
 			}
 
-			int repIndex = 1;
-			ER7_STRUCTURE_REPS: for (Structure structure : reps) {
+			int[] counter = theSegmentCounters.computeIfAbsent(nextName, k -> new int[] { 0 });
 
+			for (int i = 0; i < reps.length; i++) {
+				if (counter[0] >= locations.size()) {
+					break; // No more occurrences of this segment in the text
+				}
+
+				int[] loc = locations.get(counter[0]);
+				counter[0]++;
+
+				int repIndex = i + 1;
 				String nextPath = thePath + "/" + nextName + (repIndex > 1 ? "(" + repIndex + ")" : "");
 				mySegmentTerserPaths.add(nextPath);
-				repIndex++;
-
-				mySegmentIndexes.add((Segment) structure);
-
-				int start = 0;
-				if (mySegmentRanges.size() > 0) {
-					start = mySegmentRanges.get(mySegmentRanges.size() - 1).getEnd() + 1;
-				}
-
-				int end = theIter.getNumCharsReturned();
-				mySegmentRanges.add(new Range(start, end - 1));
-
-				if (theIter.hasNext() == false) {
-					return null;
-				}
-
-				do {
-					theNameToSearchFor = theIter.next();
-
-					// Account for \r
-					theIter.setNumCharsReturned(theIter.getNumCharsReturned() + 1);
-
-					if (theNameToSearchFor.length() < 3) {
-						mySegmentIndexes.add(null);
-						mySegmentRanges.add(null);
-					} else {
-						theNameToSearchFor = theNameToSearchFor.substring(0, 3);
-					}
-				} while (theNameToSearchFor == null);
-
-				if (!theNameToSearchFor.equals(nextName)) {
-					break ER7_STRUCTURE_REPS;
-				}
-
+				mySegmentIndexes.add((Segment) reps[i]);
+				mySegmentRanges.add(new Range(loc[0], loc[1]));
 			}
-
-		} // for
-
-		return theNameToSearchFor;
-
+		}
 	}
 
 	public void setHighlitedField(SegmentAndComponentPath theField) {
@@ -359,14 +344,18 @@ public class Hl7V2MessageEr7 extends Hl7V2MessageBase {
 			}
 		}
 		String fullPath = fullPathB.toString();
-		
-//		/*
-//		 * The encoding characters in MSH-2 make this think that we're in subcomponents
-//		 * and repetitions
-//		 */
-//		if (fullPath.startsWith("MSH-2")) {
-//			fullPath = "MSH-2";
-//		}
+
+		/*
+		 * The encoding characters in MSH-2 (^~&\ ) are indistinguishable from actual
+		 * separator characters during the raw-text scanner pass above. Strip any
+		 * spurious component / repetition / subcomponent indices.
+		 */
+		if (fullPath.startsWith("/MSH-2") && fullPath.length() > 6) {
+			char next = fullPath.charAt(6);
+			if (next == '-' || next == '(') {
+				fullPath = "/MSH-2";
+			}
+		}
 
 		ourLog.info("Highlited path is now: " + fullPath);
 
@@ -549,12 +538,15 @@ public class Hl7V2MessageEr7 extends Hl7V2MessageBase {
 
 	public void setHighlitedRangeBasedOnSegment(Segment... theSegment) {
 		if (theSegment == null || theSegment.length == 0) {
+			ourLog.info("setHighlitedRangeBasedOnSegment: null/empty");
 			myHighlitedRange = null;
 		} else {
 
 			myHighlitedRange = null;
 			for (Segment segment : theSegment) {
+				ourLog.info("setHighlitedRangeBasedOnSegment: segment name={}, identity={}", segment.getName(), System.identityHashCode(segment));
 				int newSelectedIndex = theSegment != null ? getLineIndex(segment) : -1;
+				ourLog.info("setHighlitedRangeBasedOnSegment: getLineIndex returned {}", newSelectedIndex);
 				if (newSelectedIndex != -1) {
 					Range nextRange = mySegmentRanges.get(newSelectedIndex);
 					if (nextRange == null) {
