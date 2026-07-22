@@ -93,6 +93,7 @@ import ca.uhn.hl7v2.testpanel.ui.BaseMainPanel;
 import ca.uhn.hl7v2.testpanel.ui.FileChooserOpenAccessory;
 import ca.uhn.hl7v2.testpanel.ui.FileChooserSaveAccessory;
 import ca.uhn.hl7v2.testpanel.ui.IDestroyable;
+import ca.uhn.hl7v2.testpanel.ui.WorkspaceStartupDialog;
 import ca.uhn.hl7v2.testpanel.ui.NothingSelectedPanel;
 import ca.uhn.hl7v2.testpanel.ui.TestPanelWindow;
 import ca.uhn.hl7v2.testpanel.ui.conn.CreateInboundConnectionDialog;
@@ -383,7 +384,7 @@ public class Controller {
 		if (myMessagesList.getMessages().size() > 0) {
 			setLeftSelectedItem(myMessagesList.getMessages().get(0));
 		} else {
-			tryToSelectSomething();
+			setLeftSelectedItem(myNothingSelectedMarker);
 		}
 
 		saveWorkspaceState();
@@ -1151,6 +1152,27 @@ public class Controller {
 			myView.rebindConnectionLists();
 			myView.onWorkspaceChanged();
 		}
+
+		ensureWorkspaceOpen();
+	}
+
+	private void ensureWorkspaceOpen() {
+		while (!myWorkspaceController.hasWorkspace()) {
+			WorkspaceStartupDialog dialog = new WorkspaceStartupDialog(provideViewFrameIfItExists());
+			dialog.setVisible(true);
+
+			switch (dialog.getResult()) {
+			case CREATE_NEW:
+				newWorkspace();
+				break;
+			case OPEN_EXISTING:
+				openWorkspace();
+				break;
+			case EXIT:
+				System.exit(0);
+				return;
+			}
+		}
 	}
 
 	private void saveWorkspaceState() {
@@ -1206,6 +1228,8 @@ public class Controller {
 				restoreWorkspaceIntoView(wsFile);
 			}
 		}
+
+		ensureWorkspaceOpen();
 
 	}
 

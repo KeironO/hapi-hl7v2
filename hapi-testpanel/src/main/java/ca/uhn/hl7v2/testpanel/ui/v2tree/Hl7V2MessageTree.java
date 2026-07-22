@@ -32,6 +32,8 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.EventQueue;
 import java.awt.Font;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.beans.PropertyChangeEvent;
@@ -99,6 +101,7 @@ import ca.uhn.hl7v2.util.StringUtil;
 import ca.uhn.hl7v2.validation.PrimitiveTypeRule;
 import ca.uhn.hl7v2.validation.impl.DefaultValidation;
 import ca.uhn.hl7v2.validation.impl.ValidationContextImpl;
+import net.miginfocom.swing.MigLayout;
 
 /**
  * This is a Swing panel that displays the contents of a Message object in a
@@ -781,11 +784,106 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 	}
 
 	private JPopupMenu createTreeContextMenu() {
-		JPopupMenu menu = new JPopupMenu();
-		JMenuItem editMenuItem = new JMenuItem("Edit...");
-		editMenuItem.addActionListener(e -> handleEditMenuClick());
-		menu.add(editMenuItem);
-		return menu;
+		return new TreeContextPopupMenu();
+	}
+
+	private final class TreeContextPopupMenu extends JPopupMenu {
+		@Override
+		public void show(Component theInvoker, int theX, int theY) {
+			if (theInvoker == myTree) {
+				TreePath clickedPath = myTree.getPathForLocation(theX, theY);
+				if (clickedPath != null) {
+					myTree.setSelectionPath(clickedPath);
+				}
+			}
+
+			populate();
+			super.show(theInvoker, theX, theY);
+		}
+
+		private void populate() {
+			removeAll();
+			TreePath selectedPath = myTree.getSelectionPath();
+			if (selectedPath == null) {
+				return;
+			}
+
+			Object component = selectedPath.getLastPathComponent();
+			if (component instanceof TreeNodeType) {
+				TreeNodeType node = (TreeNodeType) component;
+				addAction("Edit...", () -> showEditDialog(node));
+				if (node.getType() instanceof Primitive) {
+					addAction("Clear Value", () -> clearNodeValue(node));
+				}
+
+				addSeparator();
+				addAction("Copy Value", () -> copyToClipboard(node.getPipeEncodedValue()));
+				addAction("Copy Path", () -> copyToClipboard(node.getTerserPath()));
+			} else if (component instanceof TreeNodeSegment) {
+				TreeNodeSegment node = (TreeNodeSegment) component;
+				addAction("Copy Segment", () -> copyToClipboard(node.getPipeEncodedValue()));
+				addAction("Copy Path", () -> copyToClipboard(node.getTerserPath()));
+			} else if (component instanceof TreeNodeBase) {
+				TreeNodeBase node = (TreeNodeBase) component;
+				addAction("Copy Path", () -> copyToClipboard(node.getTerserPath()));
+			}
+
+			if (component instanceof TreeNode) {
+				TreeNode node = (TreeNode) component;
+				if (node.getChildCount() > 0) {
+					if (getComponentCount() > 0) {
+						addSeparator();
+					}
+					addAction("Expand All", () -> expandDescendants(selectedPath));
+					addAction("Collapse All", () -> collapseDescendants(selectedPath));
+				}
+			}
+		}
+
+		private void addAction(String theName, Runnable theAction) {
+			JMenuItem menuItem = new JMenuItem(theName);
+			menuItem.addActionListener(e -> {
+				setVisible(false);
+				theAction.run();
+			});
+			add(menuItem);
+		}
+	}
+
+	private void copyToClipboard(String theText) {
+		Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(theText), null);
+	}
+
+	private void clearNodeValue(TreeNodeType theNode) {
+		try {
+			updateNodeValue(theNode, "");
+			synchronizeNodeChange(theNode);
+		} catch (Exception e) {
+			ourLog.error("Failed to clear node value", e);
+			JOptionPane.showMessageDialog(myTree, "Failed to clear value: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+		}
+	}
+
+	private void expandDescendants(TreePath thePath) {
+		Object component = thePath.getLastPathComponent();
+		if (component instanceof TreeNode) {
+			TreeNode node = (TreeNode) component;
+			for (int i = 0; i < node.getChildCount(); i++) {
+				expandDescendants(thePath.pathByAddingChild(node.getChildAt(i)));
+			}
+		}
+		myTree.expandPath(thePath);
+	}
+
+	private void collapseDescendants(TreePath thePath) {
+		Object component = thePath.getLastPathComponent();
+		if (component instanceof TreeNode) {
+			TreeNode node = (TreeNode) component;
+			for (int i = 0; i < node.getChildCount(); i++) {
+				collapseDescendants(thePath.pathByAddingChild(node.getChildAt(i)));
+			}
+		}
+		myTree.collapsePath(thePath);
 	}
 
 	private void handleEditMenuClick() {
@@ -820,7 +918,7 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 
 		String newValue = null;
 		if (type instanceof Composite) {
-			newValue = showEditCompositeDialog(fieldName, (Composite) type);
+			newValue = showEditCompositeDialog(fieldName, (Composite) type, node.getTerserPath());
 		} else {
 			String currentValue = node.getPipeEncodedValue();
 			Primitive primitive = (Primitive) type;
@@ -843,27 +941,26 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 					return; // No change
 				}
 
-				// Find the message this node belongs to and update it
-				TreeNodeBase base = node;
-				while (!(base instanceof TreeNodeMessage)) {
-					base = (TreeNodeBase) base.getParent();
-				}
-
-				if (base instanceof TreeNodeMessage) {
-					TreeNodeMessage msgNode = (TreeNodeMessage) base;
-					int messageIndex = msgNode.getMessageIndex();
-					Message msg = type.getMessage();
-
-					// This syncs the parsed message back to source and triggers the display update
-					myMessages.updateSourceMessageBasedOnParsedMessage(messageIndex, msg);
-				}
-
-				myUpdaterThread.scheduleUpdateNow();
+				synchronizeNodeChange(node);
 			} catch (Exception e) {
 				ourLog.error("Failed to update node value", e);
 				javax.swing.JOptionPane.showMessageDialog(myTree, "Failed to update value: " + e.getMessage(), "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
 			}
 		}
+	}
+
+	private void synchronizeNodeChange(TreeNodeType theNode) {
+		TreeNodeBase base = theNode;
+		while (base != null && !(base instanceof TreeNodeMessage)) {
+			base = (TreeNodeBase) base.getParent();
+		}
+
+		if (base instanceof TreeNodeMessage) {
+			TreeNodeMessage msgNode = (TreeNodeMessage) base;
+			myMessages.updateSourceMessageBasedOnParsedMessage(msgNode.getMessageIndex(), theNode.getType().getMessage());
+		}
+
+		myUpdaterThread.scheduleUpdateNow();
 	}
 
 	private String showEditDateTimeDialog(String fieldName, String currentValue, String typeName) {
@@ -1168,7 +1265,7 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		return null;
 	}
 
-	private String showEditCompositeDialog(String fieldName, Composite composite) {
+	private String showEditCompositeDialog(String fieldName, Composite composite, String parentPath) {
 		javax.swing.JDialog dialog = new javax.swing.JDialog();
 		dialog.setTitle("Edit: " + fieldName);
 		dialog.setDefaultCloseOperation(javax.swing.JDialog.DISPOSE_ON_CLOSE);
@@ -1176,24 +1273,17 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		dialog.setLocationRelativeTo(myTree);
 
 		javax.swing.JPanel mainPanel = new javax.swing.JPanel();
-		mainPanel.setLayout(new java.awt.BorderLayout());
+		mainPanel.setLayout(new java.awt.BorderLayout(0, 8));
 		mainPanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
 		// Header panel with field info
-		javax.swing.JPanel headerPanel = new javax.swing.JPanel();
-		headerPanel.setLayout(new java.awt.BorderLayout());
-		headerPanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 10, 0));
-		javax.swing.JLabel headerLabel = new javax.swing.JLabel("<html><b>" + fieldName + "</b> (" + composite.getClass().getSimpleName() + ")</html>");
-		headerPanel.add(headerLabel, java.awt.BorderLayout.WEST);
-		mainPanel.add(headerPanel, java.awt.BorderLayout.NORTH);
+		javax.swing.JLabel headerLabel = new javax.swing.JLabel(fieldName + " (" + composite.getClass().getSimpleName() + ")");
+		headerLabel.setFont(headerLabel.getFont().deriveFont(java.awt.Font.BOLD));
+		mainPanel.add(headerLabel, java.awt.BorderLayout.NORTH);
 
 		// Scrollable components panel
-		javax.swing.JPanel scrollablePanel = new javax.swing.JPanel();
-		scrollablePanel.setLayout(new java.awt.GridBagLayout());
-
-		java.awt.GridBagConstraints gbc = new java.awt.GridBagConstraints();
-		gbc.anchor = java.awt.GridBagConstraints.NORTHWEST;
-		gbc.insets = new java.awt.Insets(8, 0, 8, 10);
+		javax.swing.JPanel scrollablePanel = new javax.swing.JPanel(new MigLayout(
+				"wrap 2, insets 4, gap 4", "[250!, right][grow, fill]"));
 
 		Type[] components = composite.getComponents();
 		javax.swing.JTextField[] componentFields = new javax.swing.JTextField[components.length];
@@ -1256,24 +1346,13 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 				}
 			}
 
-			// Add label with position, name, and type
-			gbc.gridx = 0;
-			gbc.gridy = i;
-			gbc.gridwidth = 1;
-			gbc.weightx = 0.0;
-			gbc.fill = java.awt.GridBagConstraints.NONE;
-			gbc.insets = new java.awt.Insets(8, 0, 8, 10);
+			String componentPath = parentPath + "-" + position;
+			String componentDisplay = componentPath + " - " + componentName + " (" + componentType + ")";
+			javax.swing.JLabel componentLabel = new javax.swing.JLabel(StringUtils.abbreviate(componentDisplay, 32));
+			componentLabel.setToolTipText(componentDisplay);
+			scrollablePanel.add(componentLabel, "right, w 0:250:250");
 
-			String labelText = "<html><b>" + position + ".</b> " + componentName + "<br/><font color='#666666' size='-1'>(" + componentType + ")</font></html>";
-			scrollablePanel.add(new javax.swing.JLabel(labelText), gbc);
-
-			// Add text field next to label
-			gbc.gridx = 1;
-			gbc.weightx = 1.0;
-			gbc.fill = java.awt.GridBagConstraints.HORIZONTAL;
-			gbc.insets = new java.awt.Insets(8, 0, 8, 0);
-
-			componentFields[i] = new javax.swing.JTextField(30);
+			componentFields[i] = new javax.swing.JTextField(24);
 			componentFields[i].setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 11));
 
 			// Get current value for this component
@@ -1284,11 +1363,12 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 				ourLog.warn("Could not encode component", e);
 			}
 
-			scrollablePanel.add(componentFields[i], gbc);
+			scrollablePanel.add(componentFields[i], "growx");
 		}
 
 		// Add scrollable panel to main panel
 		javax.swing.JScrollPane scrollPane = new javax.swing.JScrollPane(scrollablePanel);
+		scrollPane.setHorizontalScrollBarPolicy(javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 		mainPanel.add(scrollPane, java.awt.BorderLayout.CENTER);
 
 		// Button panel
@@ -1340,7 +1420,7 @@ public class Hl7V2MessageTree extends JPanel implements IDestroyable {
 		mainPanel.add(buttonPanel, java.awt.BorderLayout.SOUTH);
 
 		dialog.getContentPane().add(mainPanel);
-		dialog.setSize(700, Math.min(150 + (components.length * 50), 600));
+		dialog.setSize(640, Math.min(180 + (components.length * 34), 540));
 		dialog.setVisible(true);
 
 		return result[0] ? "composite_updated" : null;

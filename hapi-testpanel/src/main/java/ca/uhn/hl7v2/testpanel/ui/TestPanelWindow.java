@@ -1407,7 +1407,8 @@ public class TestPanelWindow implements IDestroyable {
 
 		myEditorInnerPanel.removeAll();
 		myEditorInnerPanel.add(theOutboundPanel, BorderLayout.CENTER);
-		myEditorInnerPanel.validate();
+		myEditorInnerPanel.revalidate();
+		myEditorInnerPanel.repaint();
 
 		// Update the Sending activity table and terser path label for editor panels
 		if (theOutboundPanel instanceof Hl7V2MessageEditorPanel) {
